@@ -58,7 +58,7 @@ This release has been tested succesfully on the following platforms:
 
 =head1 VERSION
 
-This is version 0.004 of DBIx::DBO2. 
+This is version 0.005 of DBIx::DBO2. 
 
 =head2 Distribution Summary
 
@@ -67,7 +67,7 @@ This module's summary in the CPAN DSLIP is intended to read:
   Name            DSLIP  Description
   --------------  -----  ---------------------------------------------
   DBIx::
-  :: DBO2         bdpOp  Objects mapping to SQL relational structures
+  ::DBO2          bdpOp  Objects mapping to SQL relational structures
 
 =head2 Beta Release
 

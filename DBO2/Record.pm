@@ -161,7 +161,7 @@ Here are a few examples to show the possibilities this provides you with:
 
 =item *
 
-To have each record of some class write to a log when it's loaded from the database:
+To have each record write to a log when it's loaded from the database:
 
   sub log_fetch { my $record = shift; warn "Loaded record $record->{id}" } );
   MyClass->install_hooks( post_fetch => \&log_fetch );
@@ -264,6 +264,12 @@ Fetch a single matching record.
 
 Fetch a single record based on its primary key.
 
+=item visit_records
+
+  @results = My::Students->visit_records( \&mysub, criteria=> ... );
+
+Calls the provided subroutine on each matching record as it is retrieved. Returns the accumulated results of each subroutine call (in list context).
+
 =item refetch_record
 
   $record->refetch_record();
@@ -286,6 +292,20 @@ sub fetch_records {
   my $table = $record_or_class->table() or croak("No table set for $class");  
   my $records = $table->fetch_select( @_ );
   bless [ map { bless $_, $class; $_->post_fetch; $_ } @$records ], 'DBIx::DBO2::RecordSet';
+}
+
+sub visit_records {
+  my $record_or_class = shift;
+  my $class = ref( $record_or_class ) || $record_or_class;
+  my $table = $record_or_class->table() or croak("No table set for $class");  
+  my $sub = shift;
+  my $func = sub { 
+    my $record = shift; 
+    bless $record, $class; 
+    $record->post_fetch; 
+    &$sub( $record ) 
+  };
+  $table->visit_select( $func, @_ );
 }
 
 sub fetch_one {
@@ -314,7 +334,7 @@ sub refetch_record {
   my $self = shift();
   my $class = ref( $self ) || $self;
   my $table = $self->table() or croak("No table set for $class");  
-  my $id = $self->{ $table->id_column() };
+  my $id = $self->{ $table->column_primary_name() };
   my $db_row = $table->fetch_id( $id )
     or confess;
   %$self = %$db_row;

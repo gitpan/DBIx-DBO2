@@ -2,9 +2,20 @@ NAME
     DBIx::DBO2::Changes - Revision history
 
 CHANGES
-  Release 0.004
+  Version 0.005
 
-    2002-03-01 Released to CPAN as 0.004.
+    [UNRELEASED]
+
+    2002-03-12 Addition of a few more field types.
+
+    2002-03-01 Fixed stringable_hash's run-time requires. Fixed missing
+    parentheses in Field type storable_hash.
+
+  Version 0.004
+
+    2002-03-01 Released to CPAN as DBIx-DBO2-0.004.tar.gz.
+
+    2002-03-01 Minimize field-specific dependencies via run-time requires.
 
     2002-02-19 Additional tweaks to Fields storable_hash.
 
@@ -17,22 +28,23 @@ CHANGES
 
     2002-01-31 Fixed line_items fetch criteria.
 
-  Release 0.003
+  Version 0.003
 
-    2002-01-31 Added comparison with other CPAN modules to ReadMe. Released
-    to CPAN.
+    2002-01-31 Released to CPAN as DBIx-DBO2-0.003.tar.gz.
+
+    2002-01-31 Added comparison with other CPAN modules to ReadMe.
 
     2002-01-26 Simon: Corrected Fields::alias(). Corrected Record's check of
     hooks before deletion and insertion. Added interfaces to
     Fields::line_items for cascade_delete, restrict_delete, and
     nullify_delete interfaces.
 
-  Release 0.002
+  Version 0.002
 
     2002-01-25 Simon: Corrected dependency; we require DBIx-SQLEngine-0.003.
     Eliminated pointless dependency on Perl 5.6.
 
-  Release 0.001
+  Version 0.001
 
     2002-01-21 Simon: Now using Composite::Inheritable hooks for post_fetch,
     etc.

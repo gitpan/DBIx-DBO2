@@ -571,6 +571,8 @@ You can now use these methods:
   $customer->ccnum_flavor() eq 'Unrecognized';
   $customer->ccnum_readable() eq '1234-5678-9101-1213';
 
+B<DEPENDCIES:> Note that this type of field requires the following modules: Data::Quantity::Finance::CreditCardNumber.
+
 =cut
 
 sub creditcardnumber {
@@ -701,6 +703,8 @@ You may specify whether a field is required or allow this to be detected based o
 =head3 The -init_and_get Interface
 
 The number field also supports the -init_and_get provided by the string field type.
+
+B<DEPENDCIES:> Note that this type of field requires the following modules: Data::Quantity::Number::Number.
 
 =cut
 
@@ -869,6 +873,8 @@ Inherited from the number field.
 
 =back
 
+B<DEPENDCIES:> Note that this type of field requires the following modules: Data::Quantity::Time::Timestamp.
+
 =cut
 
 
@@ -950,6 +956,8 @@ Inherited from the number field.
 
 =back
 
+B<DEPENDCIES:> Note that this type of field requires the following modules: Data::Quantity::Time::Date.
+
 =cut
 
 sub julian_day {
@@ -1021,6 +1029,8 @@ Inherited from the number field.
 
 =back
 
+B<DEPENDCIES:> Note that this type of field requires the following modules: Data::Quantity::Finance::Currency.
+
 =cut
 
 sub currency_uspennies {
@@ -1073,7 +1083,7 @@ A declaration of
   );
 
 Is equivalent to the following method definitions:
-  
+
   # Recalculate if status_is_cart; else return previously stored value
   sub x { 
     my $self = shift; 
@@ -1241,6 +1251,8 @@ Here's how you retrieve a specific row:
 With 31 possible characters, a length of 2 gives almost a thousand chocies, 4 gives almost a million, 6 gives almost a billion, and 8 gives 852 billion, or almost a trillion possible choices.
 
 Note that you'll want to have many more choices than you are actually going to use, both to avoid conflicts and to prevent guessing.
+
+B<DEPENDCIES:> Note that if you use the "dated" parameter, this type of field requires the following module: Time::JulianDay.
 
 =cut
 
@@ -1428,9 +1440,6 @@ sub foreign_key {
       },
     },
     'code_expr' => {
-      '_FIND_R_CLASS_' => q{
-	  my $related = _ATTR_REQUIRED_{related_class};
-	},
     },
     'behavior' => {
       'id' => q{ 
@@ -1441,7 +1450,7 @@ sub foreign_key {
 	  }
 	},
       'readable' => q{
-	  _FIND_R_CLASS_
+	  my $related = _ATTR_REQUIRED_{related_class};
 	  my $value = _GET_VALUE_ or return;
 	  my $id_method = _ATTR_REQUIRED_{related_id_method};
 	  my $foreign = $related->fetch_one(criteria => { $id_method=>$value })
@@ -1454,7 +1463,7 @@ sub foreign_key {
 	  }
 	},
       'req_obj' => q{
-	  _FIND_R_CLASS_
+	  my $related = _ATTR_REQUIRED_{related_class};
 	  my $value = _GET_VALUE_
 	    or croak "No _STATIC_ATTR_{name} foreign key ID for " . ref($self) . " ID '$self->{id}'";
 	  my $id_method = _ATTR_REQUIRED_{related_id_method};
@@ -1462,7 +1471,7 @@ sub foreign_key {
 	    or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
 	},
       'obj' => q{ 
-	  _FIND_R_CLASS_
+	  my $related = _ATTR_REQUIRED_{related_class};
 	  
 	  if ( scalar @_ ) {
 	    my $obj = shift();
@@ -1486,7 +1495,7 @@ sub foreign_key {
 	      return _ATTR_{name} => "This field can not be left empty."
 	    }
 	    if ( length( $_ ) ) {
-	      _FIND_R_CLASS_
+	      my $related = _ATTR_REQUIRED_{related_class};
 	      my $id_method = _ATTR_REQUIRED_{related_id_method};
 	      $related->fetch_one(criteria => { $id_method => $_ })
 		or return _ATTR_{name} => "This field can not be left empty."
@@ -1495,7 +1504,7 @@ sub foreign_key {
 	  return;
 	},
       'parse_text' => q{ 
-	  _FIND_R_CLASS_
+	  my $related = _ATTR_REQUIRED_{related_class};
 
 	  my $text = shift;
 	  
@@ -1662,14 +1671,9 @@ sub line_items {
 	},
       },
     },
-    'code_expr' => {
-      '_FIND_R_CLASS_' => q{
-	  my $related = _ATTR_REQUIRED_{related_class};
-	},
-    },
     'behavior' => {
       'fetch' => q{
-	  _FIND_R_CLASS_
+	  my $related = _ATTR_REQUIRED_{related_class};
 
 	  my %params = @_;
 	  
@@ -1688,7 +1692,7 @@ sub line_items {
 	  $related->fetch_records(criteria => $criteria, %params);
 	},
       'count' => q{
-	  _FIND_R_CLASS_
+	  my $related = _ATTR_REQUIRED_{related_class};
 
 	  my %params = @_;
 	  
@@ -1728,7 +1732,7 @@ sub line_items {
 	  return $count ? 0 : 1;
  	},
       'new' => q{
-	  _FIND_R_CLASS_
+	  my $related = _ATTR_REQUIRED_{related_class};
 	  
 	  my $r_field = _ATTR_REQUIRED_{related_field};
 	  my $id_method = _ATTR_REQUIRED_{id_method};
@@ -1786,8 +1790,10 @@ sub subclass_name {
       hook => { post_fetch=>'*_unpack', post_new=>'*_pack', pre_insert=>'*_pack', pre_update=>'*_pack' }
     },
     'behavior' => {
-      'get' => q{ 
-	  my $type = _GET_VALUE_;
+      'get' => q{
+	  my $type = ref( $self ) ? _GET_VALUE_ : 
+	    Class::MakeMethods::Template::ClassName::_pack_subclass
+			( _ATTR_{target_class}, $self );
 	  defined( $type ) ?  $type : '';
 	},
       'set' => q{ 
@@ -1858,6 +1864,8 @@ A reference to the hash structure is stored in the record using the field name a
   my $obj = MyClass->fetch_one(...);
   print $obj->data('key');
 
+B<DEPENDCIES:> Note that this type of field requires the following modules: String::Escape.
+
 =cut
 
 sub stringified_hash {
@@ -1880,9 +1888,10 @@ sub stringified_hash {
       },
     },
     'behavior' => {
-      '-register' => sub {
-	require String::Escape;
-      },
+      '-init' => [ sub { 
+	  require String::Escape;
+	  return;
+	} ],
       '-subs' => sub {
 	my $m_info = shift;
 	Class::MakeMethods::Standard::Hash->make(
@@ -1900,7 +1909,7 @@ sub stringified_hash {
       'unpack' => q{ 
 	  my $struct_method = _ATTR_{name};
 	  my $string = _GET_VALUE_;
-	  $self->$struct_method( String::Escape::string2hash( $string ) );
+	  $self->$struct_method( length($string) ? String::Escape::string2hash( $string ) : {} );
 	},
       'readable' => q{
 	  _GET_VALUE_
@@ -1937,6 +1946,8 @@ A reference to the hash structure is stored in the record using the field name a
   my $obj = MyClass->fetch_one(...);
   print $obj->data('key');
 
+B<DEPENDCIES:> Note that this type of field requires the following modules: Storable, MIME::Base64, Data::Dumper.
+
 =cut
 
 sub storable_hash {
@@ -1959,11 +1970,12 @@ sub storable_hash {
       },
     },
     'behavior' => {
-      '-register' => sub {
-	require Storable;
-	require MIME::Base64;
-	require Data::Dumper;
-      },
+      '-init' => [ sub { 
+	  require Storable;
+	  require MIME::Base64;
+	  require Data::Dumper;
+	  return;
+	} ],
       '-subs' => sub {
 	my $m_info = shift;
 	Class::MakeMethods::Standard::Hash->make(
@@ -1986,7 +1998,7 @@ sub storable_hash {
 	  }
 	  # warn "About to unpack storable_hash $struct_method for $self $self->{id}";
 	  $self->$struct_method( length($string) ? 
-	    Storable::thaw( MIME::Base64::decode_base64( $string ) ) : () 
+	    Storable::thaw( MIME::Base64::decode_base64( $string ) ) : {} 
 	  );
 	},
       'readable' => q{
@@ -2080,6 +2092,272 @@ The name of the method to call on the handling object. Defaults to the name of t
 =cut
 
 sub delegate { 'Universal:forward_methods' }
+
+########################################################################
+
+=head2 Field Type calculated_quantity
+
+=cut
+
+sub calculated_quantity {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'interface' => {
+      default	    => { '*_readable'=>'readable' },
+    },
+    'params' => {
+      quantity_class => undef,
+      calc_sub => undef,
+    },
+    'behavior' => {
+      '-init' => [ sub {
+	  my $m_info = shift();
+	  my $qclass = $m_info->{quantity_class};
+	  $qclass =~ s{::}{/}g;
+	  require "$qclass.pm";
+	  return;
+	} ],
+      'readable' => q{
+	  my $method = _ATTR_{name};
+	  my $qclass = _ATTR_{quantity_class};
+	  $qclass->readable_value(_SELF_->$method())
+	},
+      '-subs' => sub {
+	  my $m_info = shift();
+	  my $name = $m_info->{'name'};
+	  ( $m_info->{calc_sub} ) ? ( $name => $m_info->{calc_sub} ) : ();
+	},
+    },
+  }
+}
+
+
+########################################################################
+
+=head2 Field Type calculated_uspennies
+
+=cut
+
+sub calculated_uspennies {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:calculated_quantity' => '*' },
+    'params' => {
+      quantity_class => 'Data::Quantity::Finance::Currency::USD',
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type calculated_timestamp
+
+=cut
+
+sub calculated_timestamp {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:calculated_quantity' => '*' },
+    'params' => {
+      quantity_class => 'Data::Quantity::Time::Timestamp',
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type calculated_duration
+
+=cut
+
+sub calculated_duration {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:calculated_quantity' => '*' },
+    'params' => {
+      quantity_class => 'Data::Quantity::Time::DurationSeconds',
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type calculated_line_items
+
+=cut
+
+sub calculated_line_items {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'interface' => {
+      default	    => { },
+    },
+    'behavior' => {
+      '-subs' => sub {
+	  my $m_info = shift();
+	  my $name = $m_info->{'name'};
+	  ( $m_info->{calc_sub} ) ? ( $name => $m_info->{calc_sub} ) : ();
+	},
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type filtered_line_items
+
+=cut
+
+sub filtered_line_items {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'params' => {
+      'line_items_method' => undef,
+      'criteria' => undef,
+      'related_class' => undef,
+      'related_field' => undef,
+    },
+    'interface' => {
+      default	    => { 
+	'*'=>'fetch', 
+	'count_*'=>'count', 
+      },
+    },
+    'behavior' => {
+      'fetch' => q{
+	  my $base_method = _ATTR_{line_items_method};
+	  _SELF_->$base_method( criteria => _ATTR_{criteria} );
+	},
+      'count' => q{
+	  my $base_method = 'count_' . _ATTR_{line_items_method};
+	  _SELF_->$base_method( criteria => _ATTR_{criteria} );
+ 	},
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type dynamic_select
+
+=cut
+
+sub dynamic_select {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'params' => {
+      'related_class' => undef,
+      'default_criteria' => undef,
+      'default_order' => undef,
+      'clauses_sub' => undef,
+    },
+    'interface' => {
+      default	    => { 
+	'*'=>'fetch', 
+	'count_*'=>'count', 
+      },
+    },
+    'behavior' => {
+      'fetch' => q{
+	  my $clauses_sub = _ATTR_{clauses_sub};
+	  my @clauses = $clauses_sub ? &$clauses_sub( _SELF_ ) : ();
+	  my %clauses = ( $#clauses == 0 ) ? (criteria => @clauses) : @clauses;
+	  foreach ( qw( criteria order ) ) {
+	    $clauses{$_} ||= _ATTR_{"default_$_"} if ( _ATTR_{"default_$_"} );
+	  }
+	  my $related_class = _ATTR_REQUIRED_{related_class};
+	  $related_class->fetch_records( %clauses );
+	},
+      'count' => q{
+	  my $clauses_sub = _ATTR_{clauses_sub};
+	  my @clauses = $clauses_sub ? &$clauses_sub( _SELF_ ) : ();
+	  my %clauses = ( $#clauses == 0 ) ? (criteria => @clauses) : @clauses;
+	  foreach ( qw( criteria order ) ) {
+	    $clauses{$_} ||= _ATTR_{"default_$_"} if ( _ATTR_{"default_$_"} );
+	  }
+	  my $related_class = _ATTR_REQUIRED_{related_class};
+	  $related_class->table->count_rows( $clauses{criteria} );
+ 	},
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type dynamic_fetch
+
+=cut
+
+sub dynamic_fetch {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'params' => {
+      'related_class' => undef,
+      'default_criteria' => undef,
+      'default_order' => undef,
+      'clauses_sub' => undef,
+      'related_id_method' => 'id',
+    },
+    'interface' => {
+      default	    => { 
+	'*'=>'fetch', 
+	'*_readable'=>'readable',
+      },
+    },
+    'behavior' => {
+      'fetch' => q{
+	  my $clauses_sub = _ATTR_{clauses_sub};
+	  my @clauses = $clauses_sub ? &$clauses_sub( _SELF_ ) : ();
+	  my %clauses = ( $#clauses == 0 ) ? (criteria => @clauses) : @clauses;
+	  foreach ( qw( criteria order ) ) {
+	    $clauses{$_} ||= _ATTR_{"default_$_"} if ( _ATTR_{"default_$_"} );
+	  }
+	  my $related_class = _ATTR_REQUIRED_{related_class};
+	  $related_class->fetch_one( %clauses );
+	},
+      'readable' => q{
+	  my $fetch_method = _ATTR_REQUIRED_{name};
+	  my $foreign = _SELF_->$fetch_method() or return;
+	  if ( my $display_method = _ATTR_{related_display_method} ) {
+	    $foreign->$display_method();
+	  } else {
+	    my $related_class = _ATTR_REQUIRED_{related_class};
+	    $related_class =~ s{.*::}{}g;
+	    my $id_method = _ATTR_REQUIRED_{related_id_method};
+	    "$related_class ID #" . $foreign->$id_method();
+	  }
+	},
+      '-subs' => sub {
+	  my $m_info = shift();
+	  my $name = $m_info->{'name'};
+	  
+	  my $forward = $m_info->{'delegate'}; 
+	  my @forward = ! defined $forward ? ()
+					: ref($forward) eq 'ARRAY' ? @$forward 
+						  : split ' ', $forward;
+	  
+	  my $access = $m_info->{'accessors'}; 
+	  my @access = ! defined $access ? ()
+					: ref($access) eq 'ARRAY' ? @$access 
+						    : split ' ', $access;
+	  
+	  map({ 
+	    my $fwd = $_; 
+	    $fwd, sub { 
+	      my $obj = (shift)->$name() 
+		or Carp::croak("Can't forward $fwd because $name is empty");
+	      $obj->$fwd(@_) 
+	    } 
+	  } @forward ),
+	  map({ 
+	    my $acc = $_; 
+	    "$name\_$acc", sub { 
+	      my $obj = (shift)->$name() 
+		or return;
+	      $obj->$acc(@_) 
+	    }
+	  } @access ),
+	},
+    },
+  }
+}
 
 ########################################################################
 

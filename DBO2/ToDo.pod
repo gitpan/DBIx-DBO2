@@ -6,20 +6,34 @@ DBIx::DBO2::ToDo - Tasks, ideas, and bug reports
 
 =over 4
 
+=item *
+
+It seems to be better practice to query for test DSN in Makefile.PL, rather than in test.pl.
+
+
+=item *
+
+The current test script is woefully inadqueate, and does not test the full public interface of this framework.
+ 
 
 =item *
 
 Records should be using prototypes for new(), to simplify both setting defaults and changing the default implementation class.
 
+
 =item *
 
-Complete Fields development.
+Continue to add field types, while trying to maintain some degree of consistency in naming and clarity in interface.
 
-Integrate fields generation and column definitions to simplify subclass declarations.
 
 =item *
 
 Move most of the primary key logic into primary_key field declarations, including fetch_id.
+
+
+=item *
+
+Add automatic generation of useful indexes.
 
 
 =item *

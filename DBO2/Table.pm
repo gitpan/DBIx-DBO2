@@ -184,9 +184,9 @@ sub insert_rows {
 
 Retrieve all of the rows from the datasource.
 
-=item fetch
+=item fetch_select
 
-  $table->fetch ( CRITERIA, SORTING ) : $row_hash_array
+  $table->fetch_select ( %select_clauses ) : $row_hash_array
 
 Return rows from the table that match the provided criteria, and in the requested order, by executing a SQL select statement.
 
@@ -196,11 +196,17 @@ Return rows from the table that match the provided criteria, and in the requeste
 
 Fetch the row with the specified ID. 
 
+=item visit_select
+
+  $table->visit_select ( $sub_ref, %select_clauses ) : @results
+
+Calls the provided subroutine on each matching row as it is retrieved. Returns the accumulated results of each subroutine call (in list context).
+
 =back
 
 =cut
 
-# $rows = $self->fetch_select;
+# $rows = $self->fetch_select( %select_clauses );
 sub fetch_select {
   my $self = shift;
   
@@ -211,15 +217,21 @@ sub fetch_select {
   )
 }
 
-# $rows = $self->fetch_all;
-sub fetch_all {
+# $rows = $self->visit_select( $sub, %select_clauses );
+sub visit_select {
   my $self = shift;
+  my $sub = shift;
   
   my $datasource = $self->datasource() or croak("No datasource set for $self");
-  $datasource->fetch_select( 
+  $datasource->visit_select(
+    $sub,
     table => $self->name,
+    @_
   )
 }
+
+# $rows = $self->fetch_all;
+sub fetch_all { (shift)->fetch_select() }
 
 # $row = $self->fetch_id($id);
   # Retrieve a specific row by id
