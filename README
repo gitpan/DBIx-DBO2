@@ -1,0 +1,49 @@
+NAME
+    DBIx::DBO2::ReadMe - Getting Started with DBIx::DBO2
+
+SYNOPSIS
+      # Gateway object
+      perldoc DBIx::SQLEngine
+  
+      # Structure objects
+      perldoc DBIx::DBO2::TableSet  [???]
+      perldoc DBIx::DBO2::Table
+      perldoc DBIx::DBO2::ColumnSet
+      perldoc DBIx::DBO2::Column
+
+      # Content objects
+      perldoc DBIx::DBO2::RecordSet
+      perldoc DBIx::DBO2::Record
+
+      # Method generation
+      perldoc DBIx::DBO2::Fields
+
+DESCRIPTION
+    The DBIx::DBO2 framework is intended to facilitate the rapid development
+    of object-oriented database applications.
+
+SEE ALSO
+    See the DBIx::SQLEngine manpage for information about the underlying
+    database interface.
+
+    See the Class::DBI manpage for a similar objects-to-DBI mapping.
+
+CREDITS AND COPYRIGHT
+  Developed By
+
+      M. Simon Cavalletto, simonm@cavalletto.org
+      Evolution Softworks, www.evoscript.org
+
+  Contributors
+
+  Copyright
+
+    Copyright 2002 Matthew Simon Cavalletto.
+
+    Portions copyright 1998, 1999, 2000, 2001 Evolution Online Systems, Inc.
+
+  License
+
+    You may use, modify, and distribute this software under the same terms
+    as Perl.
+

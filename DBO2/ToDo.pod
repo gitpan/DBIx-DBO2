@@ -1,0 +1,43 @@
+=head1 NAME
+
+DBIx::DBO2::ToDo - Tasks, ideas, and bug reports
+
+=head1 TODO
+
+=over 4
+
+
+=item *
+
+Complete Fields development.
+
+Integrate fields generation and column definitions to simplify subclass declarations.
+
+
+=item *
+
+Replace Record::DefinedRow with Table::Static.
+
+
+=item *
+
+Former versions of this package used the DBO::* namespace, but this is a poor choice for public redistribution, ie CPAN. But what would be a better name for this framework? Some candidates:
+
+  DBIx::DBO2
+  DBIx::ORM
+
+
+=item *
+
+Move all of the AUTHORS and LICENSE blocks to ReadMe.pod
+Include a SEE ALSO in all modules pointing to ReadMe.pod.
+
+
+=back
+
+
+=head1 SEE ALSO
+
+L<DBIx::DBO2::ReadMe>
+
+=cut

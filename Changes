@@ -1,0 +1,11 @@
+NAME
+    DBIx::DBO2::Changes - Revision history
+
+CHANGES
+    2002-01-15 Added ColumnSet->as_hashes to simplify SQLEngine interface.
+
+    2002-01-15 Simon: Created centralized Changes and ToDo files.
+
+SEE ALSO
+    the DBIx::DBO2::ReadMe manpage
+
