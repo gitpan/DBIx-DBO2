@@ -47,6 +47,7 @@ if ( ! $dsn ) {
     'blib$', 	  # for file-based DBDs, don't show the compilation directory
     'DBO2$', 	  # nor the source directory...
   );
+  require DBI;
   foreach my $driver ( DBI->available_drivers ) {
     eval {
       DBI->install_driver($driver);

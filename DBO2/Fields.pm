@@ -55,7 +55,7 @@ use strict;
 use Class::MakeMethods::Template;
 use base qw( Class::MakeMethods::Template );
 
-use DBIx::SQLEngine::Criteria::StringEquality;
+use DBIx::SQLEngine::Criteria::Equality;
 use DBIx::SQLEngine::Criteria::And;
 
 ########################################################################
@@ -1700,7 +1700,7 @@ sub line_items {
 	  my $id = $self->$id_method()
 		or return DBIx::DBO2::RecordSet->new();
 	  my $criteria = DBIx::SQLEngine::Criteria->auto_and(
-	      DBIx::SQLEngine::Criteria::StringEquality->new($r_field=>$id),
+	      DBIx::SQLEngine::Criteria::Equality->new($r_field=>$id),
 	      ( $d_crit || () ), 
 	      ( $params{criteria} ? $params{criteria} : () ),
 	  );
@@ -1723,7 +1723,7 @@ sub line_items {
 		or return 0;
 	  # warn "Counting from " . $related->table->name;
 	  my $criteria = DBIx::SQLEngine::Criteria->auto_and(
-	      DBIx::SQLEngine::Criteria::StringEquality->new($r_field=>$id),
+	      DBIx::SQLEngine::Criteria::Equality ->new($r_field=>$id),
 	      ( $d_crit || () ), 
 	      ( $params{criteria} ? $params{criteria} : () ),
 	  );

@@ -8,6 +8,14 @@ DBIx::DBO2::Docs::Changes - Revision History
 Revision history for DBIx::DBO2:
 
 
+=head2 Version 0.008
+
+2004-04-04 Released to CPAN as DBIx-DBO2-0.008.tar.gz.
+
+2004-04-03 Fixed use of deprecated DBIx::SQLEngine::Criteria::StringEquality 
+package; thanks to Robert Rothenberg for the bug report.
+
+
 =head2 Version 0.007
 
 2004-03-30 Released to CPAN as DBIx-DBO2-0.007.tar.gz.
