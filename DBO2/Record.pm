@@ -314,7 +314,8 @@ sub fetch_one {
   my $table = $record_or_class->table() or croak("No table set for $class");  
   my $records = $table->fetch_select( @_ );
   my $record = $records->[0] or return;
-  warn "fetch_one found multiple matches" if ( scalar @$records > 1 );
+  warn "Multiple matches for fetch_one: " . join(', ', map "'$_'", @_ ) 
+				if ( scalar @$records > 1 );
   bless $record, $class;
   $record->post_fetch;
   $record;

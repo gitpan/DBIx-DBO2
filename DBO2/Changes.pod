@@ -1,16 +1,24 @@
 =head1 NAME
 
-DBIx::DBO2::Changes - Revision history
+DBIx::DBO2::Changes - Revision History
 
 
 =head1 CHANGES
 
+Revision history for DBIx::DBO2:
 
-=head2 Version 0.005  
+=head2 Version 0.006
 
-[UNRELEASED]
+2002-04-29 Released to CPAN as DBIx-DBO2-0.006.tar.gz.
 
-2002-03-12 Addition of a few more field types.
+2002-04-19 Addition of more types, rounding out range of calculated_ fields.
+
+
+=head2 Version 0.005
+
+2002-03-23 Distribution DBIx-DBO2-0.005.tar.gz.
+
+2002-03-12 Addition of more field types, including first calculated_ fields.
 
 2002-03-01 Fixed stringable_hash's run-time requires. Fixed missing parentheses in Field type storable_hash.
 

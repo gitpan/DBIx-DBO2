@@ -46,6 +46,8 @@ The results of C<-E<gt>fields()> includes field information inherited from super
 
 =cut
 
+########################################################################
+
 package DBIx::DBO2::Fields;
 
 use strict;
@@ -1080,6 +1082,7 @@ A declaration of
 
   use DBIx::DBO2::Fields (
     saved_total => 'x',
+    reset_checker => 'status_is_cart',
   );
 
 Is equivalent to the following method definitions:
@@ -1115,25 +1118,39 @@ sub saved_total {
     '-import' => { '::DBIx::DBO2::Fields:number' => '*' },
     'interface' => {
       default	    => { 
-	'*'       => 'get_or_init', 
+	'*'       => 'get_or_init_or_set', 
 	'reset_*' => 'reset', 
 	'*_difference' => 'difference', 
       },
     },
     'params' => {
       'hash_key' => '*',
-      'reset_checker' => 'status_is_cart',
+      'reset_checker' => '',
       'init_method' => 'init_*',
     },
     'code_expr' => {
     },
     'behavior' => {
       'get_or_init' => q{
-	my $check_if_reset_needed_methd = _ATTR_{reset_checker};
-	if ( $self->$check_if_reset_needed_methd() ) {
+	my $check_method = _ATTR_{reset_checker};
+	my $value = _GET_VALUE_;
+	if ( ! length $value or $check_method and $self->$check_method() ) {
 	  _BEHAVIOR_{reset}
 	} else {
-	  _GET_VALUE_;
+	  $value;
+	}
+      },
+      'get_or_init_or_set' => q{
+  	if ( scalar @_ ) { 
+	    _BEHAVIOR_{set}
+	} else {
+	  my $check_method = _ATTR_{reset_checker};
+	  my $value = _GET_VALUE_;
+	  if ( ! length $value or $check_method and $self->$check_method() ) {
+	    _BEHAVIOR_{reset}
+	  } else {
+	    $value;
+	  }
 	}
       },
       'reset' => q{
@@ -1156,10 +1173,10 @@ Like saved_total, but also has a read-only *_readable method that provides US Cu
 
 sub saved_total_uspennies {
   {
-    '-import' => { '::DBIx::DBO2::Fields:number' => '*' },
+    '-import' => { '::DBIx::DBO2::Fields:saved_total' => '*' },
     'interface' => {
       default	    => { 
-	'*'       => 'get_or_init', 
+	'*'       => 'get_or_init_or_set', 
 	'set_*' => 'set', 
 	'reset_*' => 'reset', 
 	'*_difference' => 'difference', 
@@ -1168,23 +1185,15 @@ sub saved_total_uspennies {
     },
     'params' => {
       'hash_key' => '*',
-      'reset_checker' => 'status_is_cart',
+      'reset_checker' => '',
       'init_method' => 'init_*',
     },
     'code_expr' => {
       _QUANTITY_CLASS_ => 'Data::Quantity::Finance::Currency->type("USD")',
     },
     'behavior' => {
-      'get_or_init' => q{
-	my $check_if_reset_needed_methd = _ATTR_{reset_checker};
-	if ( $self->$check_if_reset_needed_methd() or ! _GET_VALUE_ ) {
-	  _BEHAVIOR_{reset}
-	} else {
-	  _GET_VALUE_;
-	}
-      },
       'set' => q{
-	_SET_VALUE_{ shift };
+	_SET_VALUE_{ _QUANTITY_CLASS_->new( @_ )->value }
       },
       'reset' => q{
 	my $init_method = _ATTR_{init_method};
@@ -1195,11 +1204,15 @@ sub saved_total_uspennies {
 	$self->$init_method() - _GET_VALUE_;
       },
       'readable' => q{
-	my $check_if_reset_needed_methd = _ATTR_{reset_checker};
-	if ( $self->$check_if_reset_needed_methd() or ! _GET_VALUE_ ) {
+	my $check_method = _ATTR_{reset_checker};
+	my $value = _GET_VALUE_;
+	if ( ! length $value or $check_method and $self->$check_method() ) {
 	  _BEHAVIOR_{reset}
+	  $value = _GET_VALUE_;
+	} else {
+	  $value;
 	}
-	_QUANTITY_CLASS_->readable_value( _GET_VALUE_ )
+	_QUANTITY_CLASS_->readable_value( $value )
       },
     },
   }
@@ -1264,7 +1277,8 @@ sub unique_code {
       # chars => [ grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
       chars => [ (0 .. 9), grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
       date_chars => [ grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
-      hook => { pre_insert=>'assign_*' }
+      hook => { pre_insert=>'assign_*' },
+      prohibited => '^\\d+$',
     },
     'interface' => {
       default	    => { '*'=>'get_set', 'assign_*'=>'assign', 
@@ -1287,6 +1301,7 @@ sub unique_code {
 	my $dated = _STATIC_ATTR_{dated} || 0;
 	my $length = _STATIC_ATTR_{length};
 	$length -= 4 if ( $dated );
+	my $prohibited_rx = _STATIC_ATTR_{prohibited};
 	if ( $length < 1 ) { 
 	  Carp::confess("Unable to generate unique_code: field length is misisng or insufficient")
 	}
@@ -1315,7 +1330,7 @@ sub unique_code {
 	    $code .= $char->[ rand( scalar(@$char) ) ];
 	  }
 	  # Don't generate all-numeric codes
-	} until ( $code !~ /^\\d+$/i );
+	} until ( $code and ! $prohibited_rx or $code !~ /$prohibited_rx/ );
 	return $code;
       },
       fetch => q{
@@ -1641,6 +1656,7 @@ sub line_items {
       'related_class' => undef,
       'related_field' => undef,
       'default_criteria' => undef,
+      'default_order' => 'id',
     },
     'interface' => {
       default	    => { 
@@ -1688,8 +1704,11 @@ sub line_items {
 	      ( $d_crit || () ), 
 	      ( $params{criteria} ? $params{criteria} : () ),
 	  );
-	  delete $params{criteria};
-	  $related->fetch_records(criteria => $criteria, %params);
+	  $params{criteria} = $criteria;
+	  if ( my $default_order = _ATTR_{default_order} ) {
+	    $params{order} ||= $default_order
+	  }
+	  $related->fetch_records(%params);
 	},
       'count' => q{
 	  my $related = _ATTR_REQUIRED_{related_class};
@@ -1902,13 +1921,16 @@ sub stringified_hash {
       'pack' => q{ 
 	  my $struct_method = _ATTR_{name};
 	  my %hash = $self->{$struct_method} ? %{$self->{$struct_method}} : ();
-	  _SET_VALUE_{ String::Escape::hash2string(
-	    map { $_ => $hash{ $_ } } sort keys %hash
-	  ) };
+	  _SET_VALUE_{ ( ! scalar keys %hash ) ? '' :  
+	    ' ' . String::Escape::hash2string(
+	      map { $_ => $hash{ $_ } } sort keys %hash
+	    ) . ' ' 
+	  };
 	},
       'unpack' => q{ 
 	  my $struct_method = _ATTR_{name};
 	  my $string = _GET_VALUE_;
+	  $string =~ s/\A\s+|\s+\Z//g;
 	  $self->$struct_method( length($string) ? String::Escape::string2hash( $string ) : {} );
 	},
       'readable' => q{
@@ -2014,7 +2036,74 @@ sub storable_hash {
 
 ########################################################################
 
-=head1 CODE-ORIENTED FIELDS
+=head2 runnable_code
+
+A text field which is expected to contain syntactically valid Perl code.
+
+Provides an additional helper method that executes that code, by caching it as a subroutine reference.
+
+Optional parameters:
+
+=over 4
+
+=item sub_hash_key 
+
+Name of hash key under which to store a cached subroutine. Defaults to '*_sub'.
+
+=item sub_template
+
+Outline for subroutine. 
+
+=item pass_self_arg
+
+Boolean. Determines whether a reference to the object is to be passed as an argument to the subroutine.
+
+=back
+
+=cut
+
+sub runnable_code {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
+    'interface' => {
+      default => { 
+	'*' => 'get_set', 
+	'run_*'=>'run', 
+      },
+    },
+    'params' => {
+      sub_hash_key => '*_sub',
+      sub_template => q{ sub { 
+	__CODE__ 
+      } },
+      pass_self_arg => 0,
+    },
+    'code_expr' => {
+      _CACHED_SUB_ => '_SELF_->{ _ATTR_{sub_hash_key} }',
+    },
+    'behavior' => {
+      'set' => q{ 
+	  undef _CACHED_SUB_;
+	  _SET_VALUE_{ $_[0] };
+	},
+      'run' => q{
+	unless ( _CACHED_SUB_ ) {
+	  my $code = _ATTR_{sub_template};
+	  $code =~ s{\_\_CODE\_\_}{_GET_VALUE_}g;
+	  local $SIG{__DIE__};
+	  _CACHED_SUB_ = eval $code or
+	    die "Can't eval ".(_ATTR_{name})." code: ".(_GET_VALUE_)."\n$@";
+	}
+	unshift @_, _SELF_ if ( _ATTR_{pass_self_arg} );
+	&{_CACHED_SUB_}( @_ );
+      },
+    },
+  }
+}
+
+########################################################################
+
+=head1 WRAPPER FIELDS
 
 These methods provide a field-ish interface to behavior provided by other Perl methods; they are computed on the fly, and do not correspond to SQL columns.
 
@@ -2095,7 +2184,37 @@ sub delegate { 'Universal:forward_methods' }
 
 ########################################################################
 
+=head2 Field Type calculated_string
+
+B<To Do:> Documentation for this field type has not been written yet.
+
+=cut
+
+sub calculated_string {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'interface' => {
+      default	    => { },
+    },
+    'params' => {
+      calc_sub => undef,
+    },
+    'behavior' => {
+      '-subs' => sub {
+	  my $m_info = shift();
+	  my $name = $m_info->{'name'};
+	  ( $m_info->{calc_sub} ) ? ( $name => $m_info->{calc_sub} ) : ();
+	},
+    },
+  }
+}
+
+
+########################################################################
+
 =head2 Field Type calculated_quantity
+
+B<To Do:> Documentation for this field type has not been written yet.
 
 =cut
 
@@ -2136,6 +2255,8 @@ sub calculated_quantity {
 
 =head2 Field Type calculated_uspennies
 
+B<To Do:> Documentation for this field type has not been written yet.
+
 =cut
 
 sub calculated_uspennies {
@@ -2150,6 +2271,8 @@ sub calculated_uspennies {
 ########################################################################
 
 =head2 Field Type calculated_timestamp
+
+B<To Do:> Documentation for this field type has not been written yet.
 
 =cut
 
@@ -2166,6 +2289,8 @@ sub calculated_timestamp {
 
 =head2 Field Type calculated_duration
 
+B<To Do:> Documentation for this field type has not been written yet.
+
 =cut
 
 sub calculated_duration {
@@ -2180,6 +2305,8 @@ sub calculated_duration {
 ########################################################################
 
 =head2 Field Type calculated_line_items
+
+B<To Do:> Documentation for this field type has not been written yet.
 
 =cut
 
@@ -2202,6 +2329,8 @@ sub calculated_line_items {
 ########################################################################
 
 =head2 Field Type filtered_line_items
+
+B<To Do:> Documentation for this field type has not been written yet.
 
 =cut
 
@@ -2236,6 +2365,8 @@ sub filtered_line_items {
 ########################################################################
 
 =head2 Field Type dynamic_select
+
+B<To Do:> Documentation for this field type has not been written yet.
 
 =cut
 
@@ -2283,6 +2414,8 @@ sub dynamic_select {
 
 =head2 Field Type dynamic_fetch
 
+B<To Do:> Documentation for this field type has not been written yet.
+
 =cut
 
 sub dynamic_fetch {
@@ -2292,6 +2425,7 @@ sub dynamic_fetch {
       'related_class' => undef,
       'default_criteria' => undef,
       'default_order' => undef,
+      'default_limit' => 1,
       'clauses_sub' => undef,
       'related_id_method' => 'id',
     },
@@ -2306,7 +2440,7 @@ sub dynamic_fetch {
 	  my $clauses_sub = _ATTR_{clauses_sub};
 	  my @clauses = $clauses_sub ? &$clauses_sub( _SELF_ ) : ();
 	  my %clauses = ( $#clauses == 0 ) ? (criteria => @clauses) : @clauses;
-	  foreach ( qw( criteria order ) ) {
+	  foreach ( qw( criteria order limit ) ) {
 	    $clauses{$_} ||= _ATTR_{"default_$_"} if ( _ATTR_{"default_$_"} );
 	  }
 	  my $related_class = _ATTR_REQUIRED_{related_class};
