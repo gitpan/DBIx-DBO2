@@ -5,6 +5,13 @@ DBIx::DBO2::Changes - Revision history
 
 =head1 CHANGES
 
+=head2 Release 0.002
+
+2002-01-25 Simon: Corrected dependency; we require DBIx-SQLEngine-0.003. Eliminated pointless dependency on Perl 5.6.
+
+
+=head2 Release 0.001
+
 2002-01-21 Simon: Now using Composite::Inheritable hooks for post_fetch, etc.
 
 2002-01-15 Simon: Created centralized Changes and ToDo files.
@@ -13,11 +20,14 @@ DBIx::DBO2::Changes - Revision history
 
 2001-12-01 Moved Adaptor and SQLWriter functionality to DBIx::SQLEngine.
 
-2001-06-29 Simon: Moved to DBIx::DBO2 namespace.
+2001-06-29 Updates.
 
 2001-06-28 Moved query generation to SQLWriter.
 
-2001-06-27 Moved to DBIx::DBO2:: namespace. Flattened class hierarchy; we're only going to support SQL. Expunged old code. Switched to Class::MakeMethods
+2001-06-27 Moved to DBIx::DBO namespace. Flattened class hierarchy; we're only going to support SQL. Expunged old code. Switched to Class::MakeMethods
+
+
+=head1 VERSION HISTORY FOR DBO
 
 2001-05-04 Simon: Expunged Table's old dependency on Mysql.pm.
 
@@ -97,11 +107,12 @@ DBIx::DBO2::Changes - Revision history
 
 1998-03-19 SQL table refactoring.
 
-1998-03-16 DBAdaptor package (and subpackages) renamed to DBO::Table.
-
 1998-03-15 Interface munged; doc added.
 
 1998-03-12 DBAdaptor package (and subpackages) renamed to DBO::Table.
+
+
+=head1 VERSION HISTORY FOR DBAdaptor
 
 1998-03-02 Added ensure_source_exists method.
 
@@ -142,6 +153,9 @@ DBIx::DBO2::Changes - Revision history
 1997-03-** Various changes
 
 1997-02-20 Simon: General cleanup; record data moved to datastore.pm.
+
+
+=head1 VERSION HISTORY FOR Evo::msql
 
 1997-02-01 Simon: Refactored existing code into adaptor subclasses.
 
