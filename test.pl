@@ -1,7 +1,7 @@
 #!/usr/bin/perl
 
 use Test;
-BEGIN { plan tests => 10 }
+BEGIN { plan tests => 17 }
 
 use Carp;
 $SIG{__DIE__} = \&Carp::confess;
@@ -44,16 +44,7 @@ ok( 1 );
 
 CONNECT: { 
   
-  MyCDs->tableset( DBIx::DBO2::TableSet->new(
-    packages => { 
-      'MyCDs::Disc' => 'disc',
-      'MyCDs::Track' => 'track',
-      'MyCDs::Artist' => 'artist',
-      'MyCDs::Genre' => 'genre',
-    }, 
-    require_packages => 1,
-  ) );
-
+  MyCDs->init();
   MyCDs->connect_datasource( $dsn, $user, $pass );
   
   my $ds;
@@ -70,7 +61,10 @@ INIT: {
   MyCDs->declare_tables;
   MyCDs->create_tables;
   
-  MyCDs::Disc->new( 'name' => "Everything Everything" )->save_record;
+  MyCDs::Disc->new( 
+    'name' => "Everything Everything", 
+    'artist' => MyCDs::Artist->new( 'name' => 'Underworld' )->save_record,
+  )->save_record();
 }
 
 ########################################################################
@@ -84,7 +78,28 @@ foreach my $r ( $rs->records ) {
 my $disc = MyCDs::Disc->fetch_one( criteria => { 'name' => "Everything Everything" } );
 ok( $disc->name eq "Everything Everything" );
 
-ok( $disc->recorded_readable =~ /200\d/ );
+# warn "Added to DB: " . $disc->added_to_db_readable() . "\n";
+ok( $disc->added_to_db_readable =~ /200\d/ );
+
+########################################################################
+
+RESTRICT_DELETE: {
+
+  my $artist = MyCDs::Artist->fetch_one(criteria => {'name'=>"Underworld"} );
+  ok( $artist );
+
+  ok( ! $artist->delete_record );
+  ok( $artist = MyCDs::Artist->fetch_one(criteria => { 'name' => "Underworld" } ) );
+
+  ok( $artist->count_discs );
+  $artist->delete_discs;
+
+  ok( ! $artist->count_discs );
+  
+  ok( $artist->delete_record );
+  ok( ! MyCDs::Artist->fetch_one(criteria => { 'name' => "Underworld" } ) );
+  
+}
 
 ########################################################################
 

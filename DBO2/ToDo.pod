@@ -9,9 +9,19 @@ DBIx::DBO2::ToDo - Tasks, ideas, and bug reports
 
 =item *
 
+Records should be using prototypes for new(), to simplify both setting defaults and changing the default implementation class.
+
+
+=item *
+
 Complete Fields development.
 
 Integrate fields generation and column definitions to simplify subclass declarations.
+
+
+=item *
+
+Finish building out field auto-detection to include on-demand method generation.
 
 
 =item *

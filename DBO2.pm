@@ -1,3 +1,35 @@
+package DBIx::DBO2;
+
+require 5.005;
+use strict;
+
+use vars qw( $VERSION );
+$VERSION = 0.003;
+
+########################################################################
+
+use DBIx::SQLEngine;
+
+use DBIx::DBO2::Table;
+
+use DBIx::DBO2::ColumnSet;
+use DBIx::DBO2::Column;
+
+use DBIx::DBO2::RecordSet;
+use DBIx::DBO2::Record;
+
+use DBIx::DBO2::TableSet;
+
+use DBIx::DBO2::Fields;
+
+########################################################################
+
+1;
+
+__END__
+
+########################################################################
+
 =head1 NAME
 
 DBIx::DBO2 - Objects mapping to SQL relational structures
@@ -40,33 +72,7 @@ The Fields class generates accessor methods for Record classes.
 
 The I<name>Set classes are each simple classes for blessed arrays of class I<name>.
 
-=cut
 
-########################################################################
-
-package DBIx::DBO2;
-
-require 5.005;
-use strict;
-
-use vars qw( $VERSION );
-$VERSION = 0.002;
-
-use DBIx::SQLEngine;
-
-use DBIx::DBO2::Table;
-
-use DBIx::DBO2::ColumnSet;
-use DBIx::DBO2::Column;
-
-use DBIx::DBO2::RecordSet;
-use DBIx::DBO2::Record;
-
-use DBIx::DBO2::TableSet;
-
-use DBIx::DBO2::Fields;
-
-########################################################################
 
 =head1 SEE ALSO
 
@@ -74,9 +80,7 @@ See L<DBIx::DBO2::Record>, L<DBIx::DBO2::Fields>, L<DBIx::DBO2::Table>, and L<DB
 
 See L<DBIx::DBO2::ReadMe> for distribution and license information.
 
-=cut
 
-########################################################################
 
 =head1 CREDITS AND COPYRIGHT
 
@@ -103,7 +107,3 @@ You may use, modify, and distribute this software under the same terms as Perl.
 
 
 =cut
-
-########################################################################
-
-1;

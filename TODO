@@ -2,10 +2,16 @@ NAME
     DBIx::DBO2::ToDo - Tasks, ideas, and bug reports
 
 TODO
+    *   Records should be using prototypes for new(), to simplify both
+        setting defaults and changing the default implementation class.
+
     *   Complete Fields development.
 
         Integrate fields generation and column definitions to simplify
         subclass declarations.
+
+    *   Finish building out field auto-detection to include on-demand method
+        generation.
 
     *   Replace Record::DefinedRow with Table::Static.
 

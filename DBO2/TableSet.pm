@@ -46,6 +46,7 @@ sub require_packages {
   while ( my( $package, $tablename ) = each %tables  ) {
     $package =~ s{::}{/}g;
     $package .= '.pm';
+    # warn "Loading $package...\n";
     require $package;
   }
 }
@@ -70,10 +71,36 @@ sub create_tables {
   
   my %tables = $self->packages;
   while ( my( $package, $tablename ) = each %tables  ) {
-    my $cols = $package->field_columns;
     my $table = $package->table;
+    my $cols = $package->field_columns;
     $table->columnset( DBIx::DBO2::ColumnSet->new( @$cols ) );
     $table->table_create;
+  }
+}
+
+sub ensure_tables_exist {
+  my $self = shift;
+  
+  my %tables = $self->packages;
+  while ( my( $package, $tablename ) = each %tables  ) {
+    my $table = $package->table;
+    next if $table->table_exists;
+    my $cols = $package->field_columns;
+    $table->columnset( DBIx::DBO2::ColumnSet->new( @$cols ) );
+    $table->table_create;
+  }
+}
+
+sub refresh_tables_schema {
+  my $self = shift;
+  
+  my %tables = $self->packages;
+  while ( my( $package, $tablename ) = each %tables  ) {
+    my $table = $package->table;
+    next if $table->table_exists;
+    my $cols = $package->field_columns;
+    $table->columnset( DBIx::DBO2::ColumnSet->new( @$cols ) );
+    $table->table_recreate_with_rows;
   }
 }
 

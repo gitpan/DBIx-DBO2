@@ -30,12 +30,13 @@ use Class::MakeMethods (
       { name=>'tableset', class=>'DBIx::DBO2::TableSet'},
   ],
   'Standard::Universal:delegate'=>[ 
-    [ qw(datasource connect_datasource declare_tables create_tables drop_tables) ] 
+    [qw(datasource connect_datasource declare_tables create_tables drop_tables)]
 	=> { target=>'tableset'} 
   ],
 );
 
-BEGIN {
+sub init {
+  # warn "Init MyCD tableset";
   MyCDs->tableset( DBIx::DBO2::TableSet->new(
     packages => { 
       'MyCDs::Disc' => 'disc',
@@ -45,7 +46,6 @@ BEGIN {
     }, 
     require_packages => 1,
   ) );
-  # warn "Init MyCD tableset";
 }
 
 ########################################################################

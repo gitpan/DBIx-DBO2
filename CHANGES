@@ -2,6 +2,13 @@ NAME
     DBIx::DBO2::Changes - Revision history
 
 CHANGES
+  Release 0.003 - Unreleased
+
+    2002-01-26 Simon: Corrected Fields::alias(). Corrected Record's check of
+    hooks before deletion and insertion. Added interfaces to
+    Fields::line_items for cascade_delete, restrict_delete, and
+    nullify_delete interfaces.
+
   Release 0.002
 
     2002-01-25 Simon: Corrected dependency; we require DBIx-SQLEngine-0.003.
@@ -12,7 +19,7 @@ CHANGES
     2002-01-21 Simon: Now using Composite::Inheritable hooks for post_fetch,
     etc.
 
-    2002-01-15 Simon: Created centralized Changes and ToDo files.
+    2002-01-15 Created centralized Changes and ToDo files.
 
     2002-01-15 Added ColumnSet->as_hashes to simplify SQLEngine interface.
 

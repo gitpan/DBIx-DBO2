@@ -6,12 +6,24 @@ DBIx::DBO2::Record - A row in a table in a datasource
 
   package MyRecord;
   use DBIx::DBO2::Record '-isasubclass';
-  MyRecord->table( DBIx::DBO2::Table->new( name=>'foo', datasource=>$ds ) );
+  use DBIx::DBO2::Fields (
+    'sequential' => 'id',
+    'string -length 64' => 'name',
+    'timestamp --modified' => 'lastupdate',
+  );
+  
+  my $sqldb = DBIx::SQLEngine->new( ... );
+  MyRecord->table( DBIx::DBO2::Table->new( name=>'foo', datasource=>$sqldb ) );
+  unless ( MyRecord->table->table_exists ) {
+    MyRecord->table->table_create( MyRecord->field_columns );
+  }
 
-  package main;
-  my $results = MyRecord->fetch_all;
-  foreach ( $results->records ) {
-    
+  my $record = MyRecord->new( name => 'Dave' );
+  $record->save_record;
+  
+  my $results = MyRecord->fetch_records( criteria => { name => 'Dave' } );
+  foreach my $rec ( $results->records ) {
+    print $rec->name() . ' ' . $rec->lastupdate_readable();
   }
 
 =head1 DESCRIPTION
@@ -129,6 +141,55 @@ sub demand_table {
   $self->table() or croak("No table set for $class");
 }
 
+# KLUDGE
+sub column_primary_name {
+  # should croak if we've got a multiple-column primary key?
+  return 'id';
+}
+
+########################################################################
+
+=head2 Hooks
+
+Many of the methods below are labeled "Inheritable Hook." These methods allow you to register callbacks which are then invoked at specific points in each record's lifecycle. You can add these callbacks to all record classes, to a particular class, or even to a particular object instance.
+
+To register a callback, call the method and pass it a single subroutine reference which has been blessed into the Class::MakeMethods::Composite::Hook package, as follows: I<callee>->I<methodname>( Class::MakeMethods::Composite::Inheritable->Hook( I<coderef> ) ).
+
+Here are a few examples to show the possibilities this provides you with:
+
+=over 4
+
+=item *
+
+To have each record write to a log when it's loaded from the database:
+
+  my $logger = Class::MakeMethods::Composite::Inheritable->Hook( 
+    sub { my $record = shift; warn "Loaded record $record->{id}" } );
+  MyClass->post_fetch( $logger );
+
+=item *
+
+To make a class "read-only" by preventing all inserts, updates, and deletes:
+
+  my $refusal = Class::MakeMethods::Composite::Inheritable->Hook( 
+    sub { return 0 } );
+  MyClass->ok_insert( $refusal );
+  MyClass->ok_update( $refusal );
+  MyClass->ok_delete( $refusal );
+
+=item *
+
+To have a particular record automatically save any changes you've made to it when it goes out of scope:
+
+  my $record = MyClass->fetch_one( ... );
+  my $saver = Class::MakeMethods::Composite::Inheritable->Hook( 
+    sub { my $record = shift; $record->save_record } );
+  $record->pre_destroy( $saver );
+
+=back
+
+=cut
+
 ########################################################################
 
 =head2 Constructor
@@ -166,7 +227,10 @@ use Class::MakeMethods::Composite::Hash (
 
 use Class::MakeMethods::Composite::Inheritable(hook=>'post_new' ); 
 
-sub clone { (shift)->new( 'id' => '', @_ ) }
+sub clone { 
+  my $callee = shift;
+  $callee->new( $callee->column_primary_name() => '', @_ );
+}
 
 ########################################################################
 
@@ -209,33 +273,33 @@ Inheritable Hook. Subclasses should override this with any functions they wish p
 use Class::MakeMethods::Composite::Inheritable( hook=>'post_fetch' ); 
 
 sub fetch_records {
-  my $row_or_class = shift;
-  my $class = ref( $row_or_class ) || $row_or_class;
-  my $table = $row_or_class->table() or croak("No table set for $class");  
-  my $rows = $table->fetch_select( @_ );
-  bless [ map { bless $_, $class; $_->post_fetch; $_ } @$rows ], 'DBIx::DBO2::RecordSet';
+  my $record_or_class = shift;
+  my $class = ref( $record_or_class ) || $record_or_class;
+  my $table = $record_or_class->table() or croak("No table set for $class");  
+  my $records = $table->fetch_select( @_ );
+  bless [ map { bless $_, $class; $_->post_fetch; $_ } @$records ], 'DBIx::DBO2::RecordSet';
 }
 
 sub fetch_one {
-  my $row_or_class = shift;
-  my $class = ref( $row_or_class ) || $row_or_class;
-  my $table = $row_or_class->table() or croak("No table set for $class");  
-  my $rows = $table->fetch_select( @_ );
-  my $row = $rows->[0] or return;
-  warn "fetch_one found multiple matches" if ( scalar @$rows > 1 );
-  bless $row, $class;
-  $row->post_fetch;
-  $row;
+  my $record_or_class = shift;
+  my $class = ref( $record_or_class ) || $record_or_class;
+  my $table = $record_or_class->table() or croak("No table set for $class");  
+  my $records = $table->fetch_select( @_ );
+  my $record = $records->[0] or return;
+  warn "fetch_one found multiple matches" if ( scalar @$records > 1 );
+  bless $record, $class;
+  $record->post_fetch;
+  $record;
 }
 
 sub fetch_id {
-  my $row_or_class = shift;
-  my $class = ref( $row_or_class ) || $row_or_class;
-  my $table = $row_or_class->table() or croak("No table set for $class");  
-  my $row = $table->fetch_id( @_ ) or return;
-  bless $row, $class;
-  $row->post_fetch;
-  $row;
+  my $record_or_class = shift;
+  my $class = ref( $record_or_class ) || $record_or_class;
+  my $table = $record_or_class->table() or croak("No table set for $class");  
+  my $record = $table->fetch_id( @_ ) or return;
+  bless $record, $class;
+  $record->post_fetch;
+  $record;
 }
 
 sub refetch_record {
@@ -254,74 +318,109 @@ sub refetch_record {
 
 =head2 Row Inserts
 
-After constructing a record, you may save any changes by calling insert_record.
+After constructing a record with new(), you may save any changes by calling insert_record.
 
 =over 4
 
 =item insert_record
 
-  $record->insert_record () 
+Attempt to insert the record into the database.
+
+  $record->insert_record () : $record_or_undef
+
+Calls ok_insert to ensure that it's OK to insert this row, and aborts if any of hook subroutines return 0. 
+
+Calls any pre_insert hooks, then calls its table's insert_row method, then calls any post_insert hooks.
+
+Returns undef if the update was aborted, or the record if the insert was successful.
+
+=item ok_insert
+
+Inheritable Hook. Subclasses should override this with any functions they wish performed to validate rows before they are inserted.
 
 =item pre_insert
 
-Inheritable Hook. Subclasses should override this with any functions they wish performed before a row is written out to the database.
+Inheritable Hook. Subclasses should override this with any functions they wish performed immediately before a row is inserted.
 
 =item post_insert
 
-Inheritable Hook. Subclasses should override this with any functions they wish performed after a row is written out to the database.
+Inheritable Hook. Subclasses should override this with any functions they wish performed after a row is inserted.
 
 =back
 
 =cut
 
-use Class::MakeMethods::Composite::Inheritable(hook=>'pre_insert post_insert'); 
+use Class::MakeMethods::Composite::Inheritable(hook=>'ok_insert pre_insert post_insert'); 
 
-# $row->insert_record()
+# $record->insert_record()
 sub insert_record {
-  my $row = shift;
-  my $class = ref( $row ) or croak("Not a class method");
+  my $self = shift;
+  my $class = ref( $self ) or croak("Not a class method");
   my $table = $class->demand_table();
-  $row->pre_insert();
-  $table->insert_row( $row );
-  $row->post_insert();
-  1;
+  my @flags = $self->ok_insert();
+  if ( grep { length $_ and ! $_ } @flags ) {
+    # warn "Cancelling insert of $self, flags are " . join(', ', map "'$_'", @flags);
+    return undef;
+  } 
+  $self->pre_insert();
+  $table->insert_row( $self );
+  $self->post_insert();
+  $self;
 }
 
 ########################################################################
 
 =head2 Row Updates
 
-After retrieving a record, you may save any changes by calling update_record.
+After retrieving a record with one of the fetch methods, you may save any changes by calling update_record.
 
 =over 4
 
 =item update_record
 
-  $record->update_record () 
+Attempts to update the record using its primary key as a unique identifier.
+
+  $record->update_record () : $record_or_undef
+
+Calls ok_update to ensure that it's OK to update this row, and aborts if any of hook subroutines return 0. 
+
+Calls any pre_update hooks, then calls its table's update_row method, then calls any post_update hooks.
+
+Returns undef if the update was aborted, or the record if the update was successful.
+
+=item ok_update
+
+Inheritable Hook. Subclasses should override this with any functions they wish to use to validate rows before they are updated. Return 0 to abort the update.
 
 =item pre_update
 
-Inheritable Hook. Subclasses should override this with any functions they wish performed before a row is written out to the database.
+Inheritable Hook. Subclasses should override this with any functions they wish performed immediately before a row is updated.
 
 =item post_update
 
-Inheritable Hook. Subclasses should override this with any functions they wish performed after a row is written out to the database.
+Inheritable Hook. Subclasses should override this with any functions they wish performed immediately after a row is updated.
 
 =back
 
 =cut
 
-use Class::MakeMethods::Composite::Inheritable(hook=>'pre_update post_update'); 
+use Class::MakeMethods::Composite::Inheritable(hook=>'ok_update pre_update post_update'); 
 
-# $row->update_record()
+# $record->update_record()
 sub update_record {
-  my $row = shift;
-  my $class = ref( $row ) or croak("Not a class method");
+  my $self = shift;
+  my $class = ref( $self ) or croak("Not a class method");
   my $table = $class->demand_table();
-  $row->pre_update();
-  $table->update_row( $row );
-  $row->post_update();
-  1;
+  my @flags = $self->ok_update;
+  if ( grep { length $_ and ! $_ } @flags ) {
+    # warn "Cancelling update of $self, flags are " . join(', ', map "'$_'", @flags );
+    return undef;
+  } 
+  # warn "About to update $self, flags are " . join(', ', map "'$_'", @flags );
+  $self->pre_update();
+  $table->update_row( $self );
+  $self->post_update();
+  $self;
 }
 
 ########################################################################
@@ -334,37 +433,47 @@ sub update_record {
 
   $record->delete_record () : $boolean_completed
 
-Checks to see if pre_delete returns a false value. If not, asks the table to delete the row.
+Checks to see if any of the pre_delete results is "0". If not, asks the table to delete the row.
+
+Returns 1 if the deletion was successful, or 0 if it was aborted.
+
+=item ok_delete
+
+  $record->ok_delete () : @booleans
+
+Inheritable Hook. Subclasses should override this with any functions they wish to use to validate rows before they are updated. Return 0 to abort the deletion.
 
 =item pre_delete
 
-  $record->pre_delete () : $boolean_is_ok
+  $record->pre_delete ()
 
-Subclasses may override this to provide validation or other behavior
+Inheritable Hook. Subclasses should override this with any functions they wish performed before a row is deleted.
 
 =item post_delete
 
   $record->post_delete ()
 
-Called after a record has been deleted from the datasource.
+Inheritable Hook. Subclasses should override this with any functions they wish performed after a row is deleted.
 
 =back
 
 =cut
 
-use Class::MakeMethods::Composite::Inheritable(hook=>'pre_delete post_delete'); 
+use Class::MakeMethods::Composite::Inheritable(hook=>'ok_delete pre_delete post_delete'); 
 
-# $success = $row->delete_record();
+# $success = $record->delete_record();
 sub delete_record {
   my $self = shift;
-  my $flag = $self->pre_delete;
-  if ( defined $flag and ! $flag ) {
+  my @flags = $self->ok_delete;
+  if ( grep { length $_ and ! $_ } @flags ) {
+    # warn "Cancelling delete of $self, flags are " . join(', ', map "'$_'", @flags );
     return 0;
-  } else {
-    $self->table->delete_row($self);
-    $self->post_delete();
-    return 1;
-  }
+  } 
+  # warn "About to delete $self, flags are " . join(', ', map "'$_'", @flags );
+  $self->pre_delete();
+  $self->table->delete_row($self);
+  $self->post_delete();
+  return 1;
 }
 
 ########################################################################
@@ -383,16 +492,16 @@ Calls new if no ID is provided, or if the ID is the special string "-new"; other
 
 =item save_record
 
-  $record->save_record () : $boolean_completed
+  $record->save_record () : $record_or_undef
 
-Determines whether the record has an id assigned to it and then calls either insert_record or update_record.
+Determines whether the record has an id assigned to it and then calls either insert_record or update_record. Returns the record unless it fails to save the record.
 
 =back
 
 =cut
 
-# $row = $package->get_record()
-# $row = $package->get_record( $id )
+# $record = $package->get_record()
+# $record = $package->get_record( $id )
 sub get_record {
   my $package = shift;
   my $id = shift;
@@ -403,17 +512,18 @@ sub get_record {
   }
 }
 
-# $row->save_record()
+# $record->save_record()
 sub save_record {
-  my $row = shift;
-  if ( $row->{id} and $row->{id} eq 'new' ) {
-    undef $row->{id};
+  my $self = shift;
+  if ( $self->{id} and $self->{id} eq 'new' ) {
+    undef $self->{id};
   }
-  if ( $row->{'id'} ) {
-    $row->update_record( @_ );
-    1;
+  if ( $self->{ $self->column_primary_name() } ) {
+    $self->update_record( @_ );
+    $self;
   } else {
-    $row->insert_record( @_ );
+    $self->insert_record( @_ );
+    $self
   }
 }
 
@@ -450,20 +560,45 @@ Calls call_methods, and then save_record.
 
 use Class::MakeMethods::Standard::Universal ( 'call_methods'=>'call_methods' );
 
-# $row->new_and_save( 'fieldname' => 'new_value', ... )
+# $record->new_and_save( 'fieldname' => 'new_value', ... )
 sub new_and_save {
   my $callee = shift;
-  my $row = $callee->new( @_ );
-  $row->save_record;
-  $row;
+  my $record = $callee->new( @_ );
+  $record->save_record;
+  $record;
 }
 
-# $row->change_and_save( 'fieldname' => 'new_value', ... )
+# $record->change_and_save( 'fieldname' => 'new_value', ... )
 sub change_and_save {
-  my $row = shift;
-  $row->call_methods( @_ );
-  $row->save_record;
-  $row;
+  my $record = shift;
+  $record->call_methods( @_ );
+  $record->save_record;
+  $record;
+}
+
+########################################################################
+
+=head2 Destructor
+
+Automatically invoked when record is being garbage collected.
+
+=over 4
+
+=item pre_destroy
+
+  $record->pre_destroy ()
+
+Inheritable Hook. Subclasses should override this with any functions they wish called when an individual record is being garbage collected.
+
+=back
+
+=cut
+
+use Class::MakeMethods::Composite::Inheritable(hook=>'pre_destroy'); 
+
+sub DESTROY {
+  my $self = shift;
+  $self->pre_destroy();
 }
 
 ########################################################################

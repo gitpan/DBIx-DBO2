@@ -4,12 +4,12 @@ DBIx::DBO2::Table - A table in a datasource
 
 =head1 SYNOPSIS
 
-  my $self = DBIx::DBO2::Table->new( name => 'foo', datasource => $ds );
+  my $sqldb = DBIx::SQLEngine->new( ... );
   
-  my $row = $self->fetch_id(1);
-
-  my $rows = $self->fetch_select( criteria => 'status = 2' );
-  my $rows = $self->fetch_select( criteria => [ 'status = ?', 2 ] );
+  my $table = DBIx::DBO2::Table->new( name => 'foo', datasource => $ds );
+  
+  my $row = $table->fetch_id(1);
+  my $row_ary = $table->fetch_select( criteria => { status => 2 } );
 
 =head1 DESCRIPTION
 
@@ -166,7 +166,7 @@ sub insert_row {
   );
 }
 
-# $self->insert_rows( $rows );
+# $self->insert_rows( $rows_arrayref );
 sub insert_rows {
   my ($self, $rows) = @_;
   foreach ( @$rows ) { $self->insert_row( $_ ); }
@@ -218,19 +218,6 @@ sub fetch_all {
   my $datasource = $self->datasource() or croak("No datasource set for $self");
   $datasource->fetch_select( 
     table => $self->name,
-  )
-}
-
-# $rows = $self->fetch($criteria, $ordering);
-sub fetch {
-  my $self = shift;
-  
-  my $datasource = $self->datasource() or croak("No datasource set for $self");
-  $datasource->fetch_select( 
-    table => $self->name,
-    columns => '*', 
-    criteria => (shift),
-    order => (shift),
   )
 }
 
@@ -427,6 +414,44 @@ sub fetch_max {
 
 ########################################################################
 
+=head2 Storage And Source Management
+
+=over 4
+
+=item detect_datasource
+
+  $table->detect_datasource : $flag
+
+Detects whether the SQL database is avaialable by attempting to connect.
+
+
+=item table_exists
+
+  $table->table_exists : $flag
+
+Checks to see if the table exists in the SQL database by attempting to retrieve its columns.
+
+
+=back
+
+=cut
+
+# $flag = $table->detect_datasource;
+sub detect_datasource {
+  my $self = shift;
+  my $datasource = $self->datasource
+	or return;
+  $datasource->detect_any;
+}
+
+# $flag = $table->table_exists;
+sub table_exists {
+  my $self = shift;
+  $self->datasource->detect_table( $self->name ) ? 1 : 0;
+}
+
+########################################################################
+
 =head2 ColumnSet
 
 =over 4
@@ -495,11 +520,24 @@ sub get_columnset {
 
 =item table_create
 
-  $table->table_create () : ()
+  $table->table_create () 
+  $table->table_create ( $column_ary ) 
 
 =item table_drop
 
-  $table->table_drop () : ()
+  $table->table_drop () 
+
+=item table_ensure_exists
+
+  $table->table_ensure_exists ( $column_ary )
+
+Create the table's remote storage if it does not already exist.
+
+=item table_recreate
+
+  $table->table_recreate ()
+
+Remove and then recreate the table's remote storage.
 
 =back
 
@@ -508,121 +546,42 @@ sub get_columnset {
 # $self->table_create();
 sub table_create {
   my $self = shift;
-  my $datasource = $self->datasource;
-  $datasource->do_sql( 
-    $datasource->sql_create_table( $self->name, $self->columnset->as_hashes ) 
-  );
+  my $columnset = shift || $self->columnset;
+  $self->datasource->do_create_table( $self->name, $columnset->as_hashes ) ;
 }
 
-# $sql_stmt = $dba->table_drop();
+# $sql_stmt = $table->table_drop();
 sub table_drop {
   my $self = shift;
-  my $datasource = $self->datasource;
-  $datasource->do_sql( 
-    $datasource->sql_drop_table( $self->name ) 
-  );
+  $self->datasource->do_drop_table( $self->name ) ;
 }
 
-########################################################################
-
-=head2 Storage And Source Management
-
-=over 4
-
-=item source_available
-
-  $table->source_available : $flag
-
-Detects whether the DBMS is avaialable by attempting to connect.
-
-=item storage_exists
-
-  $table->storage_exists : $flag
-
-Checks to see if the table exists in the DBMS by attempting to list its fields.
-
-=item create_storage
-
-  $table->create_storage( $column_ary )
-
-Issue a create table SQL command to create storage for this table's columns.
-
-=item delete_storage
-
-  $table->delete_storage
-
-Remove the table's remote storage.
-
-=item recreate_storage
-
-  $table->recreate_storage
-
-Remove and then recreate the table's remote storage.
-
-=item ensure_storage_exists
-
-  $table->ensure_storage_exists( $column_ary )
-
-Create the table's remote storage if it does not already exist.
-
-=back
-
-=cut
-
-# $flag = $table->source_available;
-  # Check to see if we can connect, and catch any exceptions. (need db_exists)
-sub source_available {
-  my $table = shift;
-  my $dbh = eval { $table->connection; };
-  return $dbh ? 1 : 0;
-}
-
-# $flag = $table->storage_exists;
-sub storage_exists {
-  my $table = shift;
-  my $rc = eval { $table->count_rows; };
-  return (defined $rc);
-}
-
-# $table->create_storage($columns)
-  # Actually create the remote data source
-sub create_storage {
-  my($table, $columns) = @_;
-  $table->execute_sql($table->sql_create($columns));
-}
-
-# $dba->delete_storage()
-sub delete_storage {
-  my($table) = @_;
-  $table->execute_sql($table->sql_drop());
-}
-
-# $table->recreate_storage
-# $table->recreate_storage( $column_ary )
-  # Delete the source, then create it again
-sub recreate_storage { 
-  my $table = shift;
-  my $column_ary = shift || $table->columns;
-  $table->delete_storage if ( $table->storage_exists );
-  $table->create_storage( $column_ary );
-}
-
-# $table->ensure_storage_exists( $column_ary )
+# $table->table_ensure_exists( $column_ary )
   # Create the remote data source for a table if it does not already exist
-sub ensure_storage_exists {
-  my $table = shift;
-  my $column_ary = shift;
-  $table->create_storage($column_ary) unless $table->storage_exists;
+sub table_ensure_exists {
+  my $self = shift;
+  $self->table_create(@_) unless $self->table_exists;
 }
 
-# $package->recreate_storage_with_rows;
-# $package->recreate_storage_with_rows( $column_ary );
-sub recreate_storage_with_rows {
-  my $table = shift;
-  my $column_ary = shift || $table->columns;
-  my $rows = [ $table->fetch_all ];
-  $table->recreate_storage( $column_ary );
-  $table->insert_rows( $rows );
+# $table->table_recreate
+# $table->table_recreate( $column_ary )
+  # Delete the source, then create it again
+sub table_recreate { 
+  my $self = shift;
+  my $column_ary = shift || $self->columns;
+  $self->table_drop if ( $self->table_exists );
+  $self->table_create( $column_ary );
+}
+
+# $package->table_recreate_with_rows;
+# $package->table_recreate_with_rows( $column_ary );
+sub table_recreate_with_rows {
+  my $self = shift;
+  my $column_ary = shift || $self->columns;
+  my $rows = $self->fetch_select();
+  $self->table_drop;
+  $self->table_create( $column_ary );
+  $self->insert_rows( $rows );
 }
 
 ########################################################################

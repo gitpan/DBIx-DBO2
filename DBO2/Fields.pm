@@ -53,6 +53,9 @@ use strict;
 use Class::MakeMethods::Template;
 use base qw( Class::MakeMethods::Template );
 
+use DBIx::SQLEngine::Criteria::StringEquality;
+use DBIx::SQLEngine::Criteria::And;
+
 ########################################################################
 
 sub make {
@@ -70,38 +73,8 @@ my %ClassInfo;
 
 sub generic {
   {
-    'params' => {
-      'hash_key' => '*',
-      'column_autodetect' => [],
-    },
-    'interface' => {
-      default       => { '*'=>'get_set', '*_invalid' => 'invalid' },
-      read_only	    => { '*'=>'get' },
-      init_and_get  => { '*'=>'get_init', -params=>{init_method=>'init_*'} },
-    },
-    'code_expr' => { 
-      _VALUE_ => '_SELF_->{_STATIC_ATTR_{hash_key}}',
-      '-import' => { 'Template::Generic:generic' => '*' },
-    },
+    '-import' => { 'Template::Hash:generic' => '*' },
     'behavior' => {
-      'get_set' => q{ 
-	  if ( scalar @_ ) {
-	    _BEHAVIOR_{set}
-	  } else {
-	    _BEHAVIOR_{get}
-	  }
-	},
-      'get' => q{ 
-	  _GET_VALUE_
-	},
-      'set' => q{ 
-	  _SET_VALUE_{ $_[0] }
-	},
-      'get_init' => q{
-	  my $init_method = _ATTR_{'init_method'};
-	  _SET_VALUE_{ _SELF_->$init_method( @_ ) } unless ( defined _VALUE_ );
-	  _GET_VALUE_;
-	},
       'detect_column_attributes' => q{ 
 	  DBIx::DBO2::Fields::_column_autodetect( _SELF_, $m_info, )
 			  if ( $m_info->{column_autodetect} );
@@ -123,6 +96,7 @@ sub generic {
 	    } else {
 	      die "Unsurpported Field hook $method => '$code'";
 	    }
+	    # warn "Installing field hook " . $m_info->{target_class} . "->" . $method . " for $m_info->{name} ($m_info->{method_type}/$m_info->{interface})";
 	    $m_info->{target_class}->$method( 
 	      Class::MakeMethods::Composite::Inheritable->Hook( $code )
 	    )
@@ -164,16 +138,17 @@ sub generic {
 			  if ( $field->{column_autodetect} );
 	    }
 	    
-	    ( scalar(@_) == 0 ) ? (wantarray ? @results{ @names } : [@results{ @names }] ) : 
+	    ( scalar(@_) == 0 ) ? 
+			(wantarray ? @results{@names} : [@results{@names}] ) : 
 	    ( scalar(@_) == 1 ) ? $results{$_[0]} : 
-				  (wantarray ? @results{ @_ } : [@results{ @_ }] )
+				(wantarray ? @results{ @_ } : [@results{ @_ }] )
 	  },
 	  'field_columns' => sub { 
 	    my $self = shift;
 	    my @columns;
 	    foreach my $info ( $self->fields ) {
 	      my %colinfo = ( 
-		name => $info->{name}, 
+		name => $info->{hash_key}, 
 		type => $info->{column_type}, 
 		( $info->{length} ? ( length => $info->{length} ) : () ),
 		( $info->{required} ? ( required => $info->{required} ) : () ),
@@ -183,8 +158,47 @@ sub generic {
 	    wantarray ? @columns : \@columns;
 	  },
 	);
-      },
-    }
+      }
+    },
+  }
+}
+
+sub scalar {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'params' => {
+      'hash_key' => '*',
+      'column_autodetect' => [],
+    },
+    'interface' => {
+      default       => { '*'=>'get_set', '*_invalid' => 'invalid' },
+      read_only	    => { '*'=>'get' },
+      init_and_get  => { '*'=>'get_init', -params=>{init_method=>'init_*'} },
+    },
+    'code_expr' => { 
+      _VALUE_ => '_SELF_->{_STATIC_ATTR_{hash_key}}',
+      '-import' => { 'Template::Generic:generic' => '*' },
+    },
+    'behavior' => {
+      'get_set' => q{ 
+	  if ( scalar @_ ) {
+	    _BEHAVIOR_{set}
+	  } else {
+	    _BEHAVIOR_{get}
+	  }
+	},
+      'get' => q{ 
+	  _GET_VALUE_
+	},
+      'set' => q{ 
+	  _SET_VALUE_{ $_[0] }
+	},
+      'get_init' => q{
+	  my $init_method = _ATTR_{'init_method'};
+	  _SET_VALUE_{ _SELF_->$init_method( @_ ) } unless ( defined _VALUE_ );
+	  _GET_VALUE_;
+	},
+    },
   }
 }
 
@@ -314,9 +328,7 @@ Or equivalently, and perhaps more readably:
 
 sub string {
   {
-    '-import' => { 
-      '::DBIx::DBO2::Fields:generic' => '*' 
-    },
+    '-import' => { '::DBIx::DBO2::Fields:scalar' => '*' },
     'params' => {
       'length' => undef,
       'required' => undef,
@@ -653,9 +665,7 @@ The number field also supports the -init_and_get provided by the string field ty
 
 sub number {
   {
-    '-import' => { 
-      '::DBIx::DBO2::Fields:generic' => '*' 
-    },
+    '-import' => { '::DBIx::DBO2::Fields:scalar' => '*' },
     'params' => {
       'required' => '0',
       'column_type' => 'int',
@@ -665,8 +675,7 @@ sub number {
       _QUANTITY_CLASS_ => 'Data::Quantity::Number::Number',
     },
     'interface' => {
-      -default	    => 'get_set',
-      get_set       => { '*'=>'get_set', '*_readable' => 'readable', '*_invalid' => 'invalid' },
+      default       => { '*'=>'get_set', '*_readable' => 'readable', '*_invalid' => 'invalid' },
       read_only	    => { '*'=>'get' },
       init_and_get  => { '*'=>'get_init', -params=>{init_method=>'init_*'} },
     },
@@ -707,7 +716,6 @@ sub number {
 
 ########################################################################
 
-
 sub time_absolute {
   {
     '-import' => { '::DBIx::DBO2::Fields:number' => '*' },
@@ -740,6 +748,7 @@ sub time_absolute {
     'behavior' => {
       'set_current'	=> q{ 
 	_SET_VALUE_{ _QUANTITY_CLASS_->current()->value }; 
+	# warn "Setting time for " . _ATTR_{name};
       },
       'set' => q{ 
 	  _SET_VALUE_{ _QUANTITY_CLASS_->new( shift() )->value }
@@ -1148,6 +1157,21 @@ sub saved_total_uspennies {
 
 =head1 DATABASE-ORIENTED FIELDS
 
+=head2 Field Type sequential
+
+=cut
+
+sub sequential {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:number' => '*' },
+    'params' => {
+      'column_type' => 'sequential',
+      'required' => 1,
+    }
+  }
+}
+
+
 =head2 Field Type unique_code
 
 Used to generate and store a unique code for this object.
@@ -1168,7 +1192,9 @@ Here's how you retrieve a specific row:
   my $pubid = 'QX3P6N';
   $order = Acme::Order::Order->fetch_public_id( $pubid );
 
-With 41 possible characters, a length of 3 gives 68,921 choices, 4 gives 2,825,761, 6 gives 4,750,104,241, and 8 gives 7,984,925,229,121.
+With 31 possible characters, a length of 2 gives almost a thousand chocies, 4 gives almost a million, 6 gives almost a billion, and 8 gives 852 billion, or almost a trillion possible choices.
+
+Note that you'll want to have many more choices than you are actually going to use, both to avoid conflicts and to prevent guessing.
 
 =cut
 
@@ -1177,8 +1203,8 @@ sub unique_code {
     '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
     'params' => {
       length => 6,
-      chars => [ grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
-      # chars => [ (0 .. 9), grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
+      # chars => [ grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
+      chars => [ (0 .. 9), grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
       hook => { pre_insert=>'assign_*' }
     },
     'interface' => {
@@ -1191,13 +1217,18 @@ sub unique_code {
 	my $fetcher = 'fetch_' . _STATIC_ATTR_{name};
 	do {
 	  _SET_VALUE_{ $self->$generator() };
-        } while ( scalar @{ 
-	  $self->table->fetch({ _STATIC_ATTR_{hash_key} => _GET_VALUE_ }) 
-	} );
+        } while ( 
+	  $self->table->count_rows({ _STATIC_ATTR_{hash_key} => _GET_VALUE_ }) 
+	);
       },
       generate => q{
 	my $char = _STATIC_ATTR_{chars};
 	my $dated = _STATIC_ATTR_{dated} || 0;
+	my $length = _STATIC_ATTR_{length};
+	$length -= 4 if ( $dated );
+	if ( $length < 1 ) { 
+	  Carp::confess("Unable to generate unique_code: field length is misisng or insufficient")
+	}
 	my $code;
 	do { 
 	  $code = '';
@@ -1219,7 +1250,7 @@ sub unique_code {
 	      $code .= '-';
 	    }
 	  }
-	  foreach  (1 .. _STATIC_ATTR_{length} ) {
+	  foreach  (1 .. $length ) {
 	    $code .= $char->[ rand( scalar(@$char) ) ];
 	  }
 	  # Don't generate all-numeric codes
@@ -1229,7 +1260,7 @@ sub unique_code {
       fetch => q{
 	my $value = shift() 
 	  or return;
-	$self->fetch_one({ _STATIC_ATTR_{hash_key} => $value });
+	$self->fetch_one(criteria => { _STATIC_ATTR_{hash_key} => $value });
       },
     },
   }
@@ -1239,9 +1270,7 @@ sub unique_code {
 
 sub subclass_name {
   {
-    '-import' => { 
-      '::DBIx::DBO2::Fields:string' => '*' 
-    },
+    '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
     'interface' => {
       default => { '*'=>'get_set', '*_pack' => 'pack', '*_unpack' => 'unpack' },
     },
@@ -1287,6 +1316,8 @@ sub subclass_name {
 }
 
 ########################################################################
+
+=head1 RELATIONAL FIELDS
 
 =head2 Field Type foreign_key
 
@@ -1407,24 +1438,24 @@ sub foreign_key {
 	},
       'req_obj' => q{
 	  _FIND_R_CLASS_
-	    my $value = _GET_VALUE_
-	      or croak "No _STATIC_ATTR_{name} foreign key ID for " . ref($self) . " ID '$self->{id}'";
-	    my $id_method = _ATTR_REQUIRED_{related_id_method};
-	    if ( $id_method eq 'id' ) {
-	      $related->fetch_id( $value )
-		or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
-	    } else {
+	  my $value = _GET_VALUE_
+	    or croak "No _STATIC_ATTR_{name} foreign key ID for " . ref($self) . " ID '$self->{id}'";
+	  my $id_method = _ATTR_REQUIRED_{related_id_method};
+	  if ( $id_method eq 'id' ) {
+	    $related->fetch_id( $value )
+	      or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
+	  } else {
 	    $related->fetch_one({ $id_method => $value })
 	      or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
-	    }
+	  }
 	},
       'obj' => q{ 
 	  _FIND_R_CLASS_
 	  
 	  if ( scalar @_ ) {
 	    my $obj = shift();
-	    UNIVERSAL::isa($obj, $related ) 
-		or Carp::croak "Inappropriate object type!";
+	    UNIVERSAL::isa($obj, $related) 
+		or Carp::croak "Inappropriate object type for " . _ATTR_{name} . ": '$obj' should be a $related";
 	    my $id_method = _ATTR_REQUIRED_{related_id_method};
 	    my $id = $obj->$id_method()
 		or Carp::croak "Can't store reference to unsaved record";
@@ -1543,11 +1574,24 @@ Deletes B<all> of the related records.
 
 You can also specify an array-ref value for the default_criteria attribute; if present, it is treated as a list of fieldname/value pairs to be passed to the fetch and new methods of the related class.
 
+
+=head3 restrict_delete Interface
+
+Identical to the default interface except as follows: an ok_delete hook is installed to check for the existance of any related records, in which case the deletion is cancelled. This prevents you from deleting the "parent" record for a number of related records.
+
+=head3 cascade_delete Interface
+
+Identical to the default interface except as follows: a post_delete hook is installed to delete all of the related records after the parent record is deleted.
+
+=head3 nullify_delete Interface
+
+Identical to the default interface except as follows: a post_delete hook is installed to change all of the related records to have a default value.
+
 =cut
 
 sub line_items {
   {
-    '-import' => {  'Template::Generic:generic' => '*' },
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
     'params' => {
       'id_method' => 'id',
       'related_class' => undef,
@@ -1555,7 +1599,33 @@ sub line_items {
       'default_criteria' => undef,
     },
     'interface' => {
-      default	    => { '*'=>'fetch', 'count_*'=>'count', 'new_*'=>'new', 'delete_*'=>'delete' },
+      default	    => { 
+	'*'=>'fetch', 
+	'count_*'=>'count', 
+	'new_*'=>'new', 
+	'delete_*'=>'delete',
+      },
+      restrict_delete => { 
+	-base => 'default', 
+	'check_for_*'=>'check_count', 
+	-params => {
+	  hook => { ok_delete => 'check_for_*' }
+	},
+      },
+      nullify_on_delete  => { 
+	-base => 'default', 
+	'nullify_*'=>'nullify', 
+	-params => {
+	  delete_default => undef,
+	  hook => { post_delete => 'nullify_*' }
+	},
+      },
+      cascade_delete  => { 
+	-base => 'default', 
+	-params => {
+	  hook => { post_delete => 'delete_*' }
+	},
+      },
     },
     'code_expr' => {
       '_FIND_R_CLASS_' => q{
@@ -1569,36 +1639,52 @@ sub line_items {
 	  my $r_field = _ATTR_REQUIRED_{related_field};
 	  my $id_method = _ATTR_REQUIRED_{id_method};
 	  my $d_crit = _ATTR_{default_criteria};
+	  $d_crit = { @$d_crit } if ( ref($d_crit) eq 'ARRAY' );
 	  my $id = $self->$id_method()
 		or return DBIx::DBO2::RecordSet->new();
-	  my $criteria = 
-	      ( ref($d_crit) eq 'ARRAY' ) ? { $r_field=>$id, @$d_crit, @_ } :
-	      ( ref($d_crit) ) ? DBO::Criteria::And->new_with_contents( 		    DBO::Criteria::StringEquality->new_kv( $r_field,$id ), $d_crit, @_ ) 
-				      : { $r_field=>$id, @_ };
-	  $related->fetch_select($criteria);
+	  my $criteria = DBIx::SQLEngine::Criteria::And->new(
+	      DBIx::SQLEngine::Criteria::StringEquality->new($r_field=>$id),
+	      ( $d_crit || () ), 
+	      @_
+	  );
+	  $related->fetch_records(criteria => $criteria);
 	},
       'count' => q{
-	  # my $fetch_method = _STATIC_ATTR_{name};
-	  # $self->$fetch_method()->count;
-	  
 	  _FIND_R_CLASS_
 	  
 	  my $r_field = _ATTR_REQUIRED_{related_field};
 	  my $id_method = _ATTR_REQUIRED_{id_method};
 	  my $d_crit = _ATTR_{default_criteria};
+	  $d_crit = { @$d_crit } if ( ref($d_crit) eq 'ARRAY' );
 	  my $id = $self->$id_method()
-		or return DBIx::DBO2::RecordSet->new();
+		or return 0;
 	  # warn "Counting from " . $related->table->name;
-	  my $criteria = ref($d_crit) eq 'ARRAY' ? { $r_field=>$id, @$d_crit, @_ }
-						 : ref($d_crit) ? DBO::Criteria::And->new_with_contents( 		    DBO::Criteria::StringEquality->new_kv( $r_field,$id ), $d_crit, @_ ) 
-				      : { $r_field=>$id, @_ };
+	  my $criteria = DBIx::SQLEngine::Criteria::And->new(
+	      DBIx::SQLEngine::Criteria::StringEquality->new($r_field=>$id),
+	      ( $d_crit || () ), 
+	      @_
+	  );
 	  $related->table->count_rows($criteria);
  	},
       'delete' => q{
 	  my $fetch_method = _STATIC_ATTR_{name};
 	  foreach my $item ( $self->$fetch_method(@_)->records ) {
-	    $item->delete();
+	    $item->delete_record();
 	  }
+ 	},
+      'nullify' => q{
+	  my $fetch_method = _STATIC_ATTR_{name};
+	  my $r_field = _ATTR_REQUIRED_{related_field};
+	  my $default = _ATTR_{delete_default};
+	  foreach my $item ( $self->$fetch_method(@_)->records ) {
+	    $item->$r_field( $default );
+	  }
+ 	},
+      'check_count' => q{
+	  my $count_method = "count_" . _STATIC_ATTR_{name};
+	  my $count = $self->$count_method();
+	  # warn "Checking count $count_method: $count";
+	  return $count ? 0 : 1;
  	},
       'new' => q{
 	  _FIND_R_CLASS_
@@ -1629,19 +1715,25 @@ This declares a method -E<gt>x() that simply calls method -E<gt>y() and passes a
 =cut
 
 sub alias {
-  my ($class, @args) = @_;
-  my %methods;
-  while (@args) {
-    my $alias = shift @args;
-    my $base = shift @args;
-    $methods{ $alias } = sub { (shift)->$base( @_ ) };
+   {
+    '-import' => { '::DBIx::DBO2::Fields:generic' => '*' },
+    'interface' => { 
+      default => 'alias',
+      'alias' => 'alias' 
+    },
+    'params' => { 'method_name' => '*' },
+    'behavior' => {
+      'alias' => sub { my $m_info = $_[0]; sub {
+        my $target = $m_info->{'target'};
+        (shift)->$target(@_) 
+      }},
+    },
   }
-  $class->install_methods(%methods);
 }
 
 ########################################################################
 
-=head2 Field Type forward
+=head2 Field Type delegate
 
 Local alias for the Universal:forward_methods method generator.
 
@@ -1650,7 +1742,7 @@ Creates a method which delegates to an object provided by another method.
 Example:
 
   use DBIx::DBO2::Fields
-    forward => [ 
+    delegate => [ 
 	[ 'w' ], { target=> 'whistle' }, 
 	[ 'x', 'y' ], { target=> 'xylophone' }, 
 	{ name=>'z', target=>'zither', target_args=>[123], method_name=>do_zed },
@@ -1681,7 +1773,7 @@ The name of the method to call on the handling object. Defaults to the name of t
 
 =cut
 
-sub forward { 'Universal:forward_methods' }
+sub delegate { 'Universal:forward_methods' }
 
 ########################################################################
 
