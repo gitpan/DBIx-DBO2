@@ -30,7 +30,7 @@ It's based on Class::MakeMethods::Template.
 
 Calling C<-E<gt>fields()> on a class or instance returns a hash of field-name => field-attribute-hash pairs. 
 
-  my %fields = BD::Customer::Account->fields();
+  my %fields = EBiz::Customer::Account->fields();
   foreach my $fieldname ( sort keys %fields ) {
     my $field = $fields{ $fieldname };
     print "$fieldname is a $field->{meta_type} field\n";
@@ -40,7 +40,7 @@ Calling C<-E<gt>fields()> on a class or instance returns a hash of field-name =>
 
 You can also pass in a field name to retrieve its attributes.
 
-  print BD::Customer::Account->fields('public_id')->{'length'};
+  print EBiz::Customer::Account->fields('public_id')->{'length'};
 
 The results of C<-E<gt>fields()> includes field information inherited from superclasses. To access only those fields declared within a particular class, call C<-E<gt>class_fields()> instead.
 
@@ -85,6 +85,8 @@ sub generic {
 	my $target_info = $ClassInfo{$m_info->{target_class}};
 	$target_info->{ $m_info->{name} } = $m_info;
 	push @{ $target_info->{'-order'} }, $m_info;
+
+	# warn "Installing field method: " .join(', ', %$m_info ) ."\n";
 	
 	if ( my $hooks = $m_info->{'hook'} ) {
 	  while ( my ( $method, $code ) = each %$hooks ) {
@@ -343,15 +345,15 @@ sub string {
 	},
       'invalid' => q{ 
 	  _BEHAVIOR_{detect_column_attributes}
-	  for ( _GET_VALUE_ ) {
-	    if ( _ATTR_{required} and ! length( $_ ) ) {
-	      return _ATTR_{name} => "This field can not be left empty."
-	    }
-	    if ( my $length = _ATTR_{length} ) {
-	      return _ATTR_{name} => "This field can not hold more than $length " . 
-			"characters." if ( length( $_ ) > $length );
-	    }
+	  my $value = _GET_VALUE_;
+	  if ( _ATTR_{required} and ! length( $value ) ) {
+	    return _ATTR_{name} => "This field can not be left empty."
 	  }
+	  if ( my $length = _ATTR_{length} ) {
+	    return _ATTR_{name} => "This field can not hold more than " . 
+		      "$length characters." if ( length( $value ) > $length );
+	  }
+	  return;
 	},
     },
   }
@@ -360,9 +362,29 @@ sub string {
 
 ########################################################################
 
+=head2 Field Type binary
+
+Identical to the string type, except that it specifies a binary column_type for the underlying SQL DBMS column, allowing DBIx::SQLEngine to produce a platform-specific data type such as C<blob> or C<bytea>.
+
+=cut
+
+sub binary {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
+    'params' => {
+      'length' => 65536,
+      'column_type' => 'binary',
+    },
+  }
+}
+
+########################################################################
+
+=head1 STRUCTURED TEXT FIELDS
+
 =head2 Field Type phone_number
 
-Identical to the string type.
+Identical to the string type except for validation.
 
 =cut
 
@@ -375,15 +397,24 @@ sub phone_number {
     'behavior' => {
       'invalid' => q{ 
 	  _BEHAVIOR_{detect_column_attributes}
-	  for ( _GET_VALUE_ ) {
-	    if ( _ATTR_{required} and ! length( $_ ) ) {
-	      return _ATTR_{name} => "This field can not be left empty."
-	    }
-	    if ( $_ ) {
-	      my $error_msg = _QUANTITY_CLASS_->invalid_phone(_GET_VALUE_);
-	      return _ATTR_{name} => $error_msg if $error_msg;
+	  my $value = _GET_VALUE_;
+	  if ( _ATTR_{required} and ! length( $value ) ) {
+	    return _ATTR_{name} => "This field can not be left empty."
+	  }
+	  if ( $value ) {
+	    my $error_msg = _QUANTITY_CLASS_->invalid_phone($value);
+	    $value =~ s/\D+//g;
+	    if ( length($value) < 7 ) {
+	      return _ATTR_{name} => 'This is to short to be a phone number.' 
+	    } elsif ( length($value) < 10 ) {
+	      return _ATTR_{name} => 'Please include your area code.';
 	    }
 	  }
+	  if ( my $length = _ATTR_{length} ) {
+	    return _ATTR_{name} => "This field can not hold more than " . 
+		      "$length characters." if ( length( $value ) > $length );
+	  }
+	  return;
 	},
     },
   }
@@ -391,7 +422,7 @@ sub phone_number {
 
 =head2 Field Type post_code
 
-Identical to the string type.
+Identical to the string type except for validation.
 
 =cut
 
@@ -404,15 +435,19 @@ sub post_code {
     'behavior' => {
       'invalid' => q{ 
 	  _BEHAVIOR_{detect_column_attributes}
-	  for ( _GET_VALUE_ ) {
-	    if ( _ATTR_{required} and ! length( $_ ) ) {
-	      return _ATTR_{name} => "This field can not be left empty."
-	    }
-	    if ( $_ ) {
-	      my $error_msg = $self->invalid_postcode(_GET_VALUE_);
-	      return _ATTR_{name} => $error_msg if $error_msg;
-	    }
+	  my $value = _GET_VALUE_;
+	  if ( _ATTR_{required} and ! length( $value ) ) {
+	    return _ATTR_{name} => "This field can not be left empty."
 	  }
+	  if ( $value ) {
+	    my $error_msg = $self->invalid_postcode($value);
+	    return _ATTR_{name} => $error_msg if $error_msg;
+	  }
+	  if ( my $length = _ATTR_{length} ) {
+	    return _ATTR_{name} => "This field can not hold more than " . 
+		      "$length characters." if ( length( $value ) > $length );
+	  }
+	  return;
 	},
     },
   }
@@ -420,7 +455,7 @@ sub post_code {
 
 =head2 Field Type state_province
 
-Identical to the string type.
+Identical to the string type except for validation.
 
 =cut
 
@@ -441,15 +476,19 @@ sub state_province {
 	},
       'invalid' => q{ 
 	  _BEHAVIOR_{detect_column_attributes}
-	  for ( _GET_VALUE_ ) {
-	    if ( _ATTR_{required} and ! length( $_ ) ) {
-	      return _ATTR_{name} => "This field can not be left empty."
-	    }
-	    if ( $_ ) {
-	      my $error_msg = $self->invalid_state(_GET_VALUE_);
-	      return _ATTR_{name} => $error_msg if $error_msg;
-	    }
+	  my $value = _GET_VALUE_;
+	  if ( _ATTR_{required} and ! length( $value ) ) {
+	    return _ATTR_{name} => "This field can not be left empty."
 	  }
+	  if ( $value ) {
+	    my $error_msg = $self->invalid_state($value);
+	    return _ATTR_{name} => $error_msg if $error_msg;
+	  }
+	  if ( my $length = _ATTR_{length} ) {
+	    return _ATTR_{name} => "This field can not hold more than " . 
+		      "$length characters." if ( length( $value ) > $length );
+	  }
+	  return;
 	},
     },
   }
@@ -457,7 +496,7 @@ sub state_province {
 
 =head2 Field Type email_addr
 
-Identical to the string type.
+Identical to the string type except for validation.
 
 =cut
 
@@ -467,17 +506,18 @@ sub email_addr {
     'behavior' => {
       'invalid' => q{ 
 	  _BEHAVIOR_{detect_column_attributes}
-	  for ( _GET_VALUE_ ) {
-	    if ( _ATTR_{required} and ! length( $_ ) ) {
-	      return _ATTR_{name} => "This field can not be left empty."
-	    }
-	    if ( $_ ) {
-	      my $error_msg = DBIx::DBO2::Fields::invalid_email_address(_GET_VALUE_);
-	      return _ATTR_{name} => $error_msg if $error_msg;
-	    }
+	  my $value = _GET_VALUE_;
+
+	  if ( _ATTR_{required} and ! length( $value ) ) {
+	    return _ATTR_{name} => "This field can not be left empty."
 	  }
-	},
-    },
+	  if ( $value ) {
+	    my $error_msg = DBIx::DBO2::Fields::invalid_email_address(_GET_VALUE_);
+	    return _ATTR_{name} => $error_msg if $error_msg;
+	  }
+	  return;
+      },
+    }
   }
 }
 
@@ -491,7 +531,7 @@ sub invalid_email_address {
     unless $email =~ /^([\w\.-]+)\@([\w\.-]+)$/o;
   my($User, $Host) = ($1, $2);
   return 'This does not appear to be a valid e-mail domain.'
-    unless ( defined(mx($Host)) or defined(gethostbyname($Host)) );
+    unless ( defined(Net::DNS::mx($Host)) or defined(gethostbyname($Host)) );
   return;
 }
 
@@ -596,6 +636,7 @@ sub creditcardnumber {
 	      return _ATTR_{name} => "This does not appear to be a valid credit card number." unless ( _QUANTITY_CLASS_->checksum_value($_) );
 	    }
 	  }
+	  return;
 	},
     },
   }
@@ -603,7 +644,7 @@ sub creditcardnumber {
 
 ########################################################################
 
-=head1 NUMBER FIELDS
+=head1 NUMERIC QUANTITY FIELDS
 
 =head2 Field Type number
 
@@ -699,9 +740,10 @@ sub number {
 	      return _ATTR_{name} => " can only contain numeric values."
 	    }
 	    if ( _ATTR_{required} and ! length( $_ ) ) {
-	      return _ATTR_{name} => " is required."
+	      return _ATTR_{name} => "This field can not be left empty."
 	    }
 	  }
+	  return;
 	},
       'readable' => q {
 	  if ( scalar @_ ) {
@@ -1155,9 +1197,13 @@ sub saved_total_uspennies {
 
 ########################################################################
 
-=head1 DATABASE-ORIENTED FIELDS
+=head1 ID AND RELATIONAL FIELDS
 
 =head2 Field Type sequential
+
+Represents an auto-incrementing or database-assigned sequential value that forms the primarily for a table. 
+
+It is expected that you'll only have one of these per class.
 
 =cut
 
@@ -1205,14 +1251,16 @@ sub unique_code {
       length => 6,
       # chars => [ grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
       chars => [ (0 .. 9), grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
+      date_chars => [ grep { 'AEIOU' !~ /$_/ } ( 'A'..'Z') ],
       hook => { pre_insert=>'assign_*' }
     },
     'interface' => {
-      default	    => { '*'=>'get', 'assign_*'=>'assign', 
+      default	    => { '*'=>'get_set', 'assign_*'=>'assign', 
 			  'generate_*'=>'generate', 'fetch_*'=>'fetch' },
     },
     'behavior' => {
       assign => q{
+  	return if ( _GET_VALUE_ );
 	my $generator = 'generate_' . _STATIC_ATTR_{name};
 	my $fetcher = 'fetch_' . _STATIC_ATTR_{name};
 	do {
@@ -1223,6 +1271,7 @@ sub unique_code {
       },
       generate => q{
 	my $char = _STATIC_ATTR_{chars};
+	my $date_char = _STATIC_ATTR_{date_chars};
 	my $dated = _STATIC_ATTR_{dated} || 0;
 	my $length = _STATIC_ATTR_{length};
 	$length -= 4 if ( $dated );
@@ -1236,15 +1285,15 @@ sub unique_code {
 	    require Time::JulianDay;
 	    my $today = Time::JulianDay::local_julian_day(time);
 	    my $incr = $today - $dated;
-	    my $charcnt = scalar(@$char);
+	    my $charcnt = scalar(@$date_char);
 	    while ( $incr > 0 ) {
 	      use integer;
 	      my $diff = $incr % $charcnt;
 	      $incr = int( $incr / $charcnt );
-	      $code = $char->[ $diff ] . $code;
+	      $code = $date_char->[ $diff ] . $code;
 	    }
 	    if ( my $length = length($code) and length($code) < 3 ) {
-	      $code = ( $char->[0] x ( 3 - $length ) ) . $code;
+	      $code = ( $date_char->[0] x ( 3 - $length ) ) . $code;
 	    }
 	    if ( length($code) ) {
 	      $code .= '-';
@@ -1267,57 +1316,6 @@ sub unique_code {
 }
 
 ########################################################################
-
-sub subclass_name {
-  {
-    '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
-    'interface' => {
-      default => { '*'=>'get_set', '*_pack' => 'pack', '*_unpack' => 'unpack' },
-    },
-    'params' => {
-      hook => { post_fetch=>'*_unpack', post_new=>'*_pack', pre_insert=>'*_pack', pre_update=>'*_pack' }
-    },
-    'behavior' => {
-      'get' => q{ 
-	  my $type = _GET_VALUE_;
-	  defined( $type ) ?  $type : '';
-	},
-      'set' => q{ 
-	  my $type = shift;
-	  my $subclass = Class::MakeMethods::Template::ClassName::_unpack_subclass( 
-				_ATTR_{target_class}, $type );
-	  my $class = Class::MakeMethods::Template::ClassName::_provide_class( 
-	      _ATTR_{target_class}, $subclass );
-	  
-	  if ( ref _SELF_ ) {
-	    _SET_VALUE_{ $type };
-	    bless $self, $class;
-	  }
-	  return $class;
-	},
-      'pack' => q{ 
-	  my $type = _GET_VALUE_;
-	  _SET_VALUE_{ $type };
-	},
-      'unpack' => q{ 
-	  my $type = _GET_VALUE_;
-	  my $subclass = Class::MakeMethods::Template::ClassName::_unpack_subclass( 
-				_ATTR_{target_class}, $type );
-	  my $class = Class::MakeMethods::Template::ClassName::_provide_class( 
-	      _ATTR_{target_class}, $subclass );
-	  
-	  if ( ref _SELF_ ) {
-	    bless $self, $class;
-	  }
-	  return $class;
-	},
-    },
-  }
-}
-
-########################################################################
-
-=head1 RELATIONAL FIELDS
 
 =head2 Field Type foreign_key
 
@@ -1420,8 +1418,14 @@ sub foreign_key {
       'column_autodetect' => [ 'required', 0, ],
     },
     'interface' => {
-      default	    => { '*_id'=>'id', '*'=>'obj', 
-			'required_*'=>'req_obj', '*_invalid' => 'invalid' },
+      default	    => { 
+	'*_id'=>'id', 
+	'*'=>'obj', 
+	'*_parse_text'=>'parse_text',
+	'required_*'=>'req_obj', 
+	'*_readable' => 'readable', 
+	'*_invalid' => 'invalid' 
+      },
     },
     'code_expr' => {
       '_FIND_R_CLASS_' => q{
@@ -1436,18 +1440,26 @@ sub foreign_key {
 	    _GET_VALUE_
 	  }
 	},
+      'readable' => q{
+	  _FIND_R_CLASS_
+	  my $value = _GET_VALUE_ or return;
+	  my $id_method = _ATTR_REQUIRED_{related_id_method};
+	  my $foreign = $related->fetch_one(criteria => { $id_method=>$value })
+	    or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
+	  if ( my $display_method = _ATTR_{related_display_method} ) {
+	    $foreign->$display_method();
+	  } else {
+	    $related =~ s{.*::}{}g;
+	    "$related ID #$value"
+	  }
+	},
       'req_obj' => q{
 	  _FIND_R_CLASS_
 	  my $value = _GET_VALUE_
 	    or croak "No _STATIC_ATTR_{name} foreign key ID for " . ref($self) . " ID '$self->{id}'";
 	  my $id_method = _ATTR_REQUIRED_{related_id_method};
-	  if ( $id_method eq 'id' ) {
-	    $related->fetch_id( $value )
-	      or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
-	  } else {
-	    $related->fetch_one({ $id_method => $value })
-	      or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
-	  }
+	  $related->fetch_one(criteria => { $id_method => $value })
+	    or croak "Couldn't find related _STATIC_ATTR_{name} record based on $id_method '$value'";
 	},
       'obj' => q{ 
 	  _FIND_R_CLASS_
@@ -1464,24 +1476,47 @@ sub foreign_key {
 	    my $value = _GET_VALUE_
 	      or return undef;
 	    my $id_method = _ATTR_REQUIRED_{related_id_method};
-	    if ( $id_method eq 'id' ) {
-	      $related->fetch_id( $value );
-	    } else {
-	      $related->fetch_one({ $id_method => $value });
-	    }
+	    $related->fetch_one(criteria => { $id_method => $value })
 	  }
 	},
       'invalid' => q{ 
 	  _BEHAVIOR_{detect_column_attributes}
 	  for ( _GET_VALUE_ ) {
 	    if ( _ATTR_{required} and ! length( $_ ) ) {
-	      return _ATTR_{name} => " is required."
+	      return _ATTR_{name} => "This field can not be left empty."
 	    }
 	    if ( length( $_ ) ) {
 	      _FIND_R_CLASS_
-	      $related->fetch_id( $_ ) or
-		      return _ATTR_{name} => " is invalid."
+	      my $id_method = _ATTR_REQUIRED_{related_id_method};
+	      $related->fetch_one(criteria => { $id_method => $_ })
+		or return _ATTR_{name} => "This field can not be left empty."
 	    }
+	  }
+	  return;
+	},
+      'parse_text' => q{ 
+	  _FIND_R_CLASS_
+
+	  my $text = shift;
+	  
+	  my $id_method = _ATTR_REQUIRED_{related_id_method};
+	  my $display_method = _ATTR_{related_display_method};
+
+	  my $display_field = 'name';
+	  if ( ! $text ) {
+	    _SET_VALUE_{ undef }
+
+	  } elsif ( my $match = ! $display_method ? undef : $related->fetch_records( criteria => { $display_field => $text } )->record(0) ) {
+	    _SET_VALUE_{ $match->$id_method() }
+
+	  } elsif ( $match = $related->fetch_records( criteria => { $id_method => uc($text) } )->record(0) ) {
+	    _SET_VALUE_{ $match->$id_method() }
+
+	  } elsif ( $match = $related->fetch_records( criteria => [ 'synonyms like ?', "% $text %" ] )->record(0) ) {
+	    _SET_VALUE_{ $match->$id_method() }
+
+	  } else {
+	    _SET_VALUE_{ undef }
 	  }
 	},
       '-subs' => sub {
@@ -1635,6 +1670,8 @@ sub line_items {
     'behavior' => {
       'fetch' => q{
 	  _FIND_R_CLASS_
+
+	  my %params = @_;
 	  
 	  my $r_field = _ATTR_REQUIRED_{related_field};
 	  my $id_method = _ATTR_REQUIRED_{id_method};
@@ -1642,15 +1679,18 @@ sub line_items {
 	  $d_crit = { @$d_crit } if ( ref($d_crit) eq 'ARRAY' );
 	  my $id = $self->$id_method()
 		or return DBIx::DBO2::RecordSet->new();
-	  my $criteria = DBIx::SQLEngine::Criteria::And->new(
+	  my $criteria = DBIx::SQLEngine::Criteria->auto_and(
 	      DBIx::SQLEngine::Criteria::StringEquality->new($r_field=>$id),
 	      ( $d_crit || () ), 
-	      @_
+	      ( $params{criteria} ? $params{criteria} : () ),
 	  );
-	  $related->fetch_records(criteria => $criteria);
+	  delete $params{criteria};
+	  $related->fetch_records(criteria => $criteria, %params);
 	},
       'count' => q{
 	  _FIND_R_CLASS_
+
+	  my %params = @_;
 	  
 	  my $r_field = _ATTR_REQUIRED_{related_field};
 	  my $id_method = _ATTR_REQUIRED_{id_method};
@@ -1659,11 +1699,12 @@ sub line_items {
 	  my $id = $self->$id_method()
 		or return 0;
 	  # warn "Counting from " . $related->table->name;
-	  my $criteria = DBIx::SQLEngine::Criteria::And->new(
+	  my $criteria = DBIx::SQLEngine::Criteria->auto_and(
 	      DBIx::SQLEngine::Criteria::StringEquality->new($r_field=>$id),
 	      ( $d_crit || () ), 
-	      @_
+	      ( $params{criteria} ? $params{criteria} : () ),
 	  );
+	  delete $params{criteria};
 	  $related->table->count_rows($criteria);
  	},
       'delete' => q{
@@ -1700,17 +1741,280 @@ sub line_items {
 
 ########################################################################
 
+=head1 FIELDS WITH AUTOMATIC BEHAVIOR
+
+=head2 Field Type subclass_name
+
+  use DBIx::DBO2::Fields ( subclass_name => 'type' );
+
+This field type allows you to have different records in the same table be handled as various subclasses of some common Record type.
+
+  package MyClass;
+  use DBIx::DBO2::Fields ( 
+    subclass_name => 'type',
+    string => 'name',
+  );
+
+  package MyClass::Subber;
+
+  sub foo { ... }
+  
+  package main;
+  
+  my $obj = MyClass->new;
+  $obj->type('Subber');             # Rebless to subclass
+  $obj->foo;                        # New methods available
+  $obj->save_record;                # Subclass name stored in text field
+  ...
+  my $obj = MyClass->fetch_one(...);
+  print $obj->type;                 # Type is remembed after fetch,
+  $obj->foo if $obj->can('foo')     # and objects are auto-reblessed.
+
+=cut
+
+sub subclass_name {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
+    'interface' => {
+      default => { 
+	'*'=>'get_set', 
+	'*_pack' => 'pack', 
+	'*_unpack' => 'unpack' 
+      },
+    },
+    'params' => {
+      hook => { post_fetch=>'*_unpack', post_new=>'*_pack', pre_insert=>'*_pack', pre_update=>'*_pack' }
+    },
+    'behavior' => {
+      'get' => q{ 
+	  my $type = _GET_VALUE_;
+	  defined( $type ) ?  $type : '';
+	},
+      'set' => q{ 
+	  my $type = shift;
+	  my $subclass = 
+		Class::MakeMethods::Template::ClassName::_unpack_subclass( 
+				_ATTR_{target_class}, $type );
+	# my $class = Class::MakeMethods::Template::ClassName::_provide_class( 
+	#      _ATTR_{target_class}, $subclass );
+	  my $class = Class::MakeMethods::Template::ClassName::_require_class( 
+	      $subclass );
+	  
+	  if ( ref _SELF_ ) {
+	    _SET_VALUE_{ $type };
+	    bless $self, $class;
+	  }
+	  return $class;
+	},
+      'pack' => q{ 
+	  my $class = ref( $self ) or Carp::confess "Not a class method";
+	  my $type = Class::MakeMethods::Template::ClassName::_pack_subclass
+			( _ATTR_{target_class}, $class );
+	  _SET_VALUE_{ $type };
+	},
+      'unpack' => q{ 
+	  my $type = _GET_VALUE_;
+	  my $subclass = Class::MakeMethods::Template::ClassName::_unpack_subclass( 
+				_ATTR_{target_class}, $type );
+	# my $class = Class::MakeMethods::Template::ClassName::_provide_class( 
+	#      _ATTR_{target_class}, $subclass );
+	  my $class = Class::MakeMethods::Template::ClassName::_require_class( 
+	      $subclass );
+	  
+	  if ( ref _SELF_ ) {
+	    bless $self, $class;
+	  }
+	  return $class;
+	},
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type stringified_hash
+
+  use DBIx::DBO2::Fields ( stringified_hash => 'data' );
+
+This field type allows you to manipulate a simple hash of key-value pairs for each record, which is automatically converted to and from a stringified form in the database. Don't store nested data structures in the values.
+
+A reference to the hash structure is stored in the record using the field name as the hash key, but this is not saved in the database. The text version of the data is packed into and unpacked outof a string stored under the hash key "packed_I<name>", using the string2hash and hash2string functions from String::Escape.
+
+  package MyClass;
+  use DBIx::DBO2::Record '-isasubclass';
+  use DBIx::DBO2::Fields ( 
+    stringified_hash => 'data',
+    ...
+  );
+
+  package main;
+  my $obj = MyClass->new;
+  $obj->data( 'key' => $non_ref_value );
+  print $obj->data('key');
+  %info = $obj->data();
+  $obj->save_record;
+  ...
+  
+  my $obj = MyClass->fetch_one(...);
+  print $obj->data('key');
+
+=cut
+
+sub stringified_hash {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
+    'interface' => {
+      default => { 
+	'packed_*'=>'get_set', 
+	'*_pack' => 'pack', 
+	'*_unpack' => 'unpack', 
+	'*_readable'=>'readable',
+      },
+    },
+    'params' => {
+      hash_key => 'packed_*',
+      hook => { 
+	post_fetch => '*_unpack',
+	pre_insert => '*_pack',
+	pre_update => '*_pack',
+      },
+    },
+    'behavior' => {
+      '-register' => sub {
+	require String::Escape;
+      },
+      '-subs' => sub {
+	my $m_info = shift;
+	Class::MakeMethods::Standard::Hash->make(
+	  -TargetClass => $m_info->{target_class},
+	  'hash' => [ $m_info->{name} => { auto_init => 1 } ],
+	)
+      },
+      'pack' => q{ 
+	  my $struct_method = _ATTR_{name};
+	  my %hash = $self->{$struct_method} ? %{$self->{$struct_method}} : ();
+	  _SET_VALUE_{ String::Escape::hash2string(
+	    map { $_ => $hash{ $_ } } sort keys %hash
+	  ) };
+	},
+      'unpack' => q{ 
+	  my $struct_method = _ATTR_{name};
+	  my $string = _GET_VALUE_;
+	  $self->$struct_method( String::Escape::string2hash( $string ) );
+	},
+      'readable' => q{
+	  _GET_VALUE_
+	},
+    },
+  }
+}
+
+########################################################################
+
+=head2 Field Type storable_hash
+
+  use DBIx::DBO2::Fields ( storable_hash => 'data' );
+
+This field type allows you to manipulate a hash structure for each record, which is automatically converted to and from a stringified form in the database. You can store nested data structures in the values.
+
+A reference to the hash structure is stored in the record using the field name as the hash key, but this is not saved in the database. The text version of the data is packed into and unpacked outof a string stored under the hash key "packed_I<name>", using the Storable module.
+
+  package MyClass;
+  use DBIx::DBO2::Record '-isasubclass';
+  use DBIx::DBO2::Fields ( 
+    storable_hash => 'data',
+    ...
+  );
+
+  package main;
+  my $obj = MyClass->new;
+  $obj->data( 'key' => [ 1, 2, 3 ] );
+  print $obj->data('key');
+  %info = $obj->data();
+  $obj->save_record;
+  ...
+  
+  my $obj = MyClass->fetch_one(...);
+  print $obj->data('key');
+
+=cut
+
+sub storable_hash {
+  {
+    '-import' => { '::DBIx::DBO2::Fields:string' => '*' },
+    'interface' => {
+      default => { 
+	'packed_*'=>'get_set', 
+	'*_pack' => 'pack', 
+	'*_unpack' => 'unpack',
+	'*_readable'=>'readable',
+      },
+    },
+    'params' => {
+      hash_key => 'packed_*',
+      hook => { 
+	post_fetch => '*_unpack',
+	pre_insert => '*_pack',
+	pre_update => '*_pack',
+      },
+    },
+    'behavior' => {
+      '-register' => sub {
+	require Storable;
+	require MIME::Base64;
+	require Data::Dumper;
+      },
+      '-subs' => sub {
+	my $m_info = shift;
+	Class::MakeMethods::Standard::Hash->make(
+	  -TargetClass => $m_info->{target_class},
+	  'hash' => $m_info->{name},
+	)
+      },
+      'pack' => q{ 
+	  my $struct_method = _ATTR_{name};
+	  my %hash = $self->{$struct_method} ? %{$self->{$struct_method}} : ();
+	  _SET_VALUE_{ ! scalar(keys %hash) ? '' : 
+		MIME::Base64::encode_base64( Storable::nfreeze \%hash ) }
+	},
+      'unpack' => q{ 
+	  my $struct_method = _ATTR_{name};
+	  my $string = _GET_VALUE_;
+	  if ( length($string) and $string !~ m{^BQ} ) {
+	    warn "Skipping mangled storable_hash $struct_method for $self $self->{id}";
+	    return;
+	  }
+	  # warn "About to unpack storable_hash $struct_method for $self $self->{id}";
+	  $self->$struct_method( length($string) ? 
+	    Storable::thaw( MIME::Base64::decode_base64( $string ) ) : () 
+	  );
+	},
+      'readable' => q{
+	  my $struct_method = _ATTR_{name};
+	  my %hash = $self->$struct_method();
+	  my $string = Data::Dumper->Dump( [\%hash], [ $struct_method ] );
+	  $string =~ s/^\$$struct_method\s\=\s\{(.*)\}\;$/$1/s;
+	  $string;
+	},
+    },
+  }
+}
+
+########################################################################
+
 =head1 CODE-ORIENTED FIELDS
 
-The below types are for internal use and do not correspond to SQL columns.
+These methods provide a field-ish interface to behavior provided by other Perl methods; they are computed on the fly, and do not correspond to SQL columns.
 
 =head2 Field Type alias
 
   use DBIx::DBO2::Fields (
-    alias => [ 'x' => 'y' ],
+    alias => [ 'x', { target=>'subject' } ],
   );
 
 This declares a method -E<gt>x() that simply calls method -E<gt>y() and passes along all of its arguments.
+
+B<Note:> This method does not store a value, and does not correspond to an SQL column.
 
 =cut
 
@@ -1738,6 +2042,8 @@ sub alias {
 Local alias for the Universal:forward_methods method generator.
 
 Creates a method which delegates to an object provided by another method. 
+
+B<Note:> This method does not store a value, and does not correspond to an SQL column.
 
 Example:
 
@@ -1807,45 +2113,13 @@ creditcardnumber: I<$record>-E<gt>x_readable(I<readable_value>)
 
 =back
 
-=head1 CHANGES
 
-2002-01-17 Simon: Update of Fields to use new version of Class::MakeMethods.
+=head1 SEE ALSO
 
-2001-04-09 Simon: Added line_items attrib: default_criteria=>[field=>value,...]
-
-2001-02-07 Simon: Completed fields() method, and improved column attr detection.
-
-2001-01-30 Simon: Added _readable method for all number fields (for ',000's).
-
-2001-01-29 Simon: Filled in missing chunks of documentation.
-
-2001-01-29 Simon: Added *_invalid methods and column-info detection. 
-
-2001-01-20 Simon: Added saved_total_uspennies
-
-2001-01-16 Simon: Added saved_total
-
-2000-12    Simon: Added currency_uspennies, timestamp, and julian_day types
-
-2000-12    Simon: Added foreign_key and line_items types
-
-2000-08-04 Simon: Moved package into EBiz::Database. 
-
-2000-03-30 Simon: Julian day readable now calls method to access value.
-
-2000-03-10 Simon: Added get_and_set, get_set_filter.
-
-2000-03-06 Simon: Added get_set_alias
-
-2000-02-29 Simon: Created.
-
-
-=head1 COPYRIGHT
-
-Copyright 2000, 2001 Evolution Online Systems, Inc.
-
-You may use, modify, and distribute this software under the same terms as Perl.
+See L<DBIx::DBO2> for an overview of this framework.
 
 =cut
+
+########################################################################
 
 1;

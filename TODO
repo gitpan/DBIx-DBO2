@@ -10,8 +10,13 @@ TODO
         Integrate fields generation and column definitions to simplify
         subclass declarations.
 
+    *   Move most of the primary key logic into primary_key field
+        declarations, including fetch_id.
+
     *   Finish building out field auto-detection to include on-demand method
         generation.
+
+    *   Fix RecordSet filtering and sorting.
 
     *   Replace Record::DefinedRow with Table::Static.
 

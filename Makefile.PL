@@ -3,7 +3,7 @@ WriteMakefile(
     'NAME'		=> 'DBIx::DBO2',
     'VERSION_FROM'	=> 'DBO2.pm', 
     'PREREQ_PM'		=> {
-	DBIx::SQLEngine	   => 0.003, # for ->detect_table method
+	DBIx::SQLEngine	   => 0.005, # for new Criteria methods
 	Class::MakeMethods => 1.001, # for Composite::Inheritable:hook
     }, 
     ($] >= 5.005 ? (

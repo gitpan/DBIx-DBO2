@@ -153,7 +153,7 @@ sub column_primary_name {
 
 Many of the methods below are labeled "Inheritable Hook." These methods allow you to register callbacks which are then invoked at specific points in each record's lifecycle. You can add these callbacks to all record classes, to a particular class, or even to a particular object instance.
 
-To register a callback, call the method and pass it a single subroutine reference which has been blessed into the Class::MakeMethods::Composite::Hook package, as follows: I<callee>->I<methodname>( Class::MakeMethods::Composite::Inheritable->Hook( I<coderef> ) ).
+To register a callback, call the install_hooks method, and pass it pairs of a hook method name, and a subroutine reference, as follows: I<callee>->install_hooks( I<methodname> => I<coderef>, ... ).
 
 Here are a few examples to show the possibilities this provides you with:
 
@@ -161,34 +161,42 @@ Here are a few examples to show the possibilities this provides you with:
 
 =item *
 
-To have each record write to a log when it's loaded from the database:
+To have each record of some class write to a log when it's loaded from the database:
 
-  my $logger = Class::MakeMethods::Composite::Inheritable->Hook( 
-    sub { my $record = shift; warn "Loaded record $record->{id}" } );
-  MyClass->post_fetch( $logger );
+  sub log_fetch { my $record = shift; warn "Loaded record $record->{id}" } );
+  MyClass->install_hooks( post_fetch => \&log_fetch );
 
 =item *
 
 To make a class "read-only" by preventing all inserts, updates, and deletes:
 
-  my $refusal = Class::MakeMethods::Composite::Inheritable->Hook( 
-    sub { return 0 } );
-  MyClass->ok_insert( $refusal );
-  MyClass->ok_update( $refusal );
-  MyClass->ok_delete( $refusal );
+  my $refusal = sub { return 0 };
+  MyClass->install_hooks( 
+    ok_insert => $refusal, 
+    ok_update => $refusal, 
+    ok_delete => $refusal, 
+  );
 
 =item *
 
 To have a particular record automatically save any changes you've made to it when it goes out of scope:
 
   my $record = MyClass->fetch_one( ... );
-  my $saver = Class::MakeMethods::Composite::Inheritable->Hook( 
-    sub { my $record = shift; $record->save_record } );
-  $record->pre_destroy( $saver );
+  my $saver = sub { my $record = shift; $record->save_record };
+  $record->install_hooks( pre_destroy => $saver );
 
 =back
 
 =cut
+
+sub install_hooks {
+  my $callee = shift;
+  while ( my( $method_name, $code_ref ) = splice( @_, 0, 2 ) ) {
+    $callee->$method_name( 
+      Class::MakeMethods::Composite::Inheritable->Hook( $code_ref )
+    );
+  }
+}
 
 ########################################################################
 
@@ -505,7 +513,7 @@ Determines whether the record has an id assigned to it and then calls either ins
 sub get_record {
   my $package = shift;
   my $id = shift;
-  if ( ! $id or $id eq "-new" ) {
+  if ( ! $id or $id eq "new" or $id eq "-new" ) {
     $package->new();
   } else {
     $package->fetch_id( $id );
