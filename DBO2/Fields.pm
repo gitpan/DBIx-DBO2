@@ -209,7 +209,7 @@ sub scalar {
 sub _look_for_column {
   my ($record, $colname) = @_;
   return unless ( UNIVERSAL::can($record, 'table') );
-  my @columns = $record->table->columns;
+  my @columns = eval { local $SIG{__DIE__}; $record->table->columns };
   foreach my $column ( @columns ) {
     return $column if ( $column->name eq $colname );
   }

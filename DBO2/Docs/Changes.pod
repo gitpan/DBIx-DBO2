@@ -1,11 +1,25 @@
 =head1 NAME
 
-DBIx::DBO2::Changes - Revision History
+DBIx::DBO2::Docs::Changes - Revision History
 
 
 =head1 CHANGES
 
 Revision history for DBIx::DBO2:
+
+
+=head2 Version 0.007
+
+2004-03-30 Released to CPAN as DBIx-DBO2-0.007.tar.gz.
+
+2004-03-30 Expunged old schema classes in favor of DBIx::SQLEngine::Schema.
+
+2004-03-26 Continued updates to work with DBIx::SQLEngine version 0.018.
+
+2004-03-23 Beginning updates to work with DBIx::SQLEngine version 0.016.
+
+2004-03-23 Moved POD files to a new Docs directory.
+
 
 =head2 Version 0.006
 

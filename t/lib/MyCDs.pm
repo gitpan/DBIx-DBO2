@@ -22,12 +22,13 @@ package MyCDs;
 
 use strict;
 use DBIx::DBO2;
+use DBIx::DBO2::Schema;
 
 ########################################################################
 
 use Class::MakeMethods (
   'Standard::Global:object' => [
-      { name=>'tableset', class=>'DBIx::DBO2::TableSet'},
+      { name=>'tableset', class=>'DBIx::DBO2::Schema'},
   ],
   'Standard::Universal:delegate'=>[ 
     [qw(datasource connect_datasource declare_tables create_tables drop_tables)]
@@ -37,7 +38,7 @@ use Class::MakeMethods (
 
 sub init {
   # warn "Init MyCD tableset";
-  MyCDs->tableset( DBIx::DBO2::TableSet->new(
+  MyCDs->tableset( DBIx::DBO2::Schema->new(
     packages => { 
       'MyCDs::Disc' => 'disc',
       'MyCDs::Track' => 'track',

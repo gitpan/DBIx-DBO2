@@ -1,5 +1,5 @@
 NAME
-    DBIx::DBO2::ReadMe - Getting Started with DBIx::DBO2
+    DBIx::DBO2::Docs::ReadMe - Getting Started with DBIx::DBO2
 
 SYNOPSIS
       package MyRecord;
@@ -20,10 +20,9 @@ SYNOPSIS
       }
 
 DESCRIPTION
-    DBIx::DBO2 is an object-relational mapping framework (or perhaps a
-    relational-object mapping framework, if I understand the distinction
-    correctly) that facilitates the development of Perl classes whose
-    objects are stored in a SQL database table.
+    DBIx::DBO2 is an object-relational mapping framework that facilitates
+    the development of Perl classes whose objects are stored in a SQL
+    database table.
 
 INSTALLING
     You should be able to install this module using the CPAN shell
@@ -103,20 +102,27 @@ SEE ALSO
     manpage.
 
 CREDITS AND COPYRIGHT
-  Developed By
+  Author
 
-      M. Simon Cavalletto, simonm@cavalletto.org
-      Evolution Softworks, www.evoscript.org
+    Developed by Matthew Simon Cavalletto at Evolution Softworks.
+
+    You may contact the author directly at "evo@cpan.org" or
+    "simonm@cavalletto.org". More free Perl software is available at
+    "www.evoscript.org".
 
   Contributors
 
-      Piglet / EJ Evans, piglet@piglet.org
-      Eric Schneider, roark@evolution.com
-      Chaos / Matthew Sheahan
+    Many thanks to the kind people who have contributed code and other
+    feedback:
+
+      Eric Schneider, Evolution Online Systems
+      E. J. Evans, Evolution Online Systems
+      Matthew Sheahan, Evolution Online Systems
+      Eduardo Iturrate, Evolution Online Systems
 
   Copyright
 
-    Copyright 2002 Matthew Simon Cavalletto.
+    Copyright 2002, 2003, 2004 Matthew Cavalletto.
 
     Portions copyright 1997, 1998, 1999, 2000, 2001 Evolution Online
     Systems, Inc.

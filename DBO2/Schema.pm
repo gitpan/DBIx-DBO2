@@ -1,11 +1,11 @@
 =head1 NAME
 
-DBIx::DBO2::TableSet - Group of tables and associated record classes
+DBIx::DBO2::Schema - Group of tables and associated record classes
 
 =head1 SYNOPSIS
 
-  use DBIx::DBO2::TableSet;
-  my $ts = DBIx::DBO2::TableSet->new();
+  use DBIx::DBO2::Schema;
+  my $ts = DBIx::DBO2::Schema->new();
   $ts->connect_datasource( $dsn, $user, $pass );
   $ts->packages( 'MyClassName' => 'mytablename' );
   $ts->require_packages;
@@ -17,19 +17,19 @@ This is an example use of the DBIx::DBO2 framework used for testing purposes.
 
 =cut
 
-package DBIx::DBO2::TableSet;
+package DBIx::DBO2::Schema;
 
 use strict;
 use Carp;
 use Class::MakeMethods;
 
-use DBIx::DBO2::Table;
+use DBIx::SQLEngine::Schema::Table;
 
 ########################################################################
 
 use Class::MakeMethods::Standard::Hash (
-  'new' => 'new',
-  'object' => { name=>'datasource', class=>'DBIx::SQLEngine::Default'},
+  'new' => 'new', 
+  'object' => { name=>'datasource', class=>'DBIx::SQLEngine::Driver::Default'},
   'hash' => 'packages',
 );
 
@@ -58,9 +58,7 @@ sub declare_tables {
   my $datasource = $self->datasource;
   my %tables = $self->packages;
   while ( my( $package, $tablename ) = each %tables  ) {
-    $package->table( 
-      DBIx::DBO2::Table->new( name => $tablename, datasource => $datasource ) 
-    );
+    $package->table( $datasource->table( $tablename ) )
   }
 }
 
@@ -72,9 +70,10 @@ sub create_tables {
   my %tables = $self->packages;
   while ( my( $package, $tablename ) = each %tables  ) {
     my $table = $package->table;
+    $table->columnset( DBIx::SQLEngine::Schema::ColumnSet->new() );
     my $cols = $package->field_columns;
-    $table->columnset( DBIx::DBO2::ColumnSet->new( @$cols ) );
-    $table->table_create;
+    $table->columnset( DBIx::SQLEngine::Schema::ColumnSet->new( @$cols ) );
+    $table->create_table;
   }
 }
 
@@ -87,7 +86,7 @@ sub ensure_tables_exist {
     next if $table->table_exists;
     my $cols = $package->field_columns;
     $table->columnset( DBIx::DBO2::ColumnSet->new( @$cols ) );
-    $table->table_create;
+    $table->create_table;
   }
 }
 
@@ -100,7 +99,7 @@ sub refresh_tables_schema {
     next if $table->table_exists;
     my $cols = $package->field_columns;
     $table->columnset( DBIx::DBO2::ColumnSet->new( @$cols ) );
-    $table->table_recreate_with_rows;
+    $table->recreate_table_with_rows;
   }
 }
 
@@ -110,7 +109,7 @@ sub drop_tables {
   my %tables = $self->packages;
   while ( my( $package, $tablename ) = each %tables  ) {
     my $table = $package->table	or next;
-    $table->table_drop;
+    $table->drop_table;
   }
 }
 

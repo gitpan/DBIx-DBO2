@@ -13,9 +13,9 @@ DBIx::DBO2::Record - A row in a table in a datasource
   );
   
   my $sqldb = DBIx::SQLEngine->new( ... );
-  MyRecord->table( DBIx::DBO2::Table->new( name=>'foo', datasource=>$sqldb ) );
+  MyRecord->table( $sqldb->table( 'foo' );
   unless ( MyRecord->table->table_exists ) {
-    MyRecord->table->table_create( MyRecord->field_columns );
+    MyRecord->table->create_table( MyRecord->field_columns );
   }
 
   my $record = MyRecord->new( name => 'Dave' );
@@ -46,8 +46,12 @@ use Carp;
 =cut
 
 use Class::MakeMethods;
-use DBIx::DBO2::Table;
+
+use DBIx::SQLEngine;
+use DBIx::SQLEngine::Schema::Table;
 use DBIx::SQLEngine::Criteria;
+
+use DBIx::DBO2::RecordSet;
 
 ########################################################################
 
@@ -127,24 +131,15 @@ Delegated to datasource.
 =cut
 
 Class::MakeMethods->make(
-  'Template::ClassInherit:object' => [ table => { class => 'DBIx::DBO2::Table' } ],
+  'Template::ClassInherit:object' => [ table => {class=>'DBIx::SQLEngine::Schema::Table'} ],
   'Standard::Universal:delegate' => [ 
-    [ qw/ count_rows / ] => { target=>'table' },
-    [ qw/ datasource / ] => { target=>'table' },
-    [ qw/ do_sql / ] => { target=>'datasource' },
+    [ qw( count_rows datasource do_sql column_primary_name ) ] => { target=>'table' },
   ],
 );
 
 sub demand_table {
   my $self = shift;
-  my $class = ref( $self ) || $self;
-  $self->table() or croak("No table set for $class");
-}
-
-# KLUDGE
-sub column_primary_name {
-  # should croak if we've got a multiple-column primary key?
-  return 'id';
+  $self->table() or croak("No table set for " . ( ref( $self ) || $self ));
 }
 
 ########################################################################
@@ -312,10 +307,12 @@ sub fetch_one {
   my $record_or_class = shift;
   my $class = ref( $record_or_class ) || $record_or_class;
   my $table = $record_or_class->table() or croak("No table set for $class");  
+  
   my $records = $table->fetch_select( @_ );
+  ( scalar @$records < 2 ) or
+    carp "Multiple matches for fetch_one: " . join(', ', map "'$_'", @_ );
+  
   my $record = $records->[0] or return;
-  warn "Multiple matches for fetch_one: " . join(', ', map "'$_'", @_ ) 
-				if ( scalar @$records > 1 );
   bless $record, $class;
   $record->post_fetch;
   $record;
@@ -549,11 +546,10 @@ sub save_record {
   }
   if ( $self->{ $self->column_primary_name() } ) {
     $self->update_record( @_ );
-    $self;
   } else {
     $self->insert_record( @_ );
-    $self
   }
+  $self;
 }
 
 ########################################################################
